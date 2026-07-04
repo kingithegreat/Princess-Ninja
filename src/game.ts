@@ -1,5 +1,20 @@
 import { bindInput } from "./input";
 import {
+  CameraShakeState,
+  EFFECTS_CONFIG,
+  Particle,
+  ScorePopup,
+  advanceParticles,
+  advancePopups,
+  createCameraShakeState,
+  shakeOffset,
+  spawnBurst,
+  spawnScorePopup,
+  spawnTrailParticle,
+  tickShake,
+  triggerShake,
+} from "./effects";
+import {
   DIFFICULTY_TIERS,
   FULL_WIDTH_LANE,
   JUMP_TYPES,
@@ -10,6 +25,7 @@ import {
   spawnWave,
 } from "./obstacles";
 import {
+  JUMP_DURATION,
   PlayerState,
   createPlayerState,
   moveLane,
@@ -37,6 +53,11 @@ const SPAWN_INTERVAL_MAX = 1.4;
 /** A lane change only counts as a stylish dodge if it happened this
  * recently relative to the obstacle reaching the player. */
 const DODGE_RELEVANCE_WINDOW = 1.2;
+/** How much camera trauma a crash adds — big enough to read as an impact
+ * without throwing the whole scene around. */
+const CRASH_SHAKE_TRAUMA = 0.8;
+const TRICK_BURST_COLOR = "#ffd166";
+const PLAYER_TRAIL_COLOR = "#7b61ff";
 
 function laneCenterY(lane: number): number {
   return LANE_TOP + lane * LANE_HEIGHT + LANE_HEIGHT / 2;
@@ -67,6 +88,11 @@ export class Game {
   private gameOver = false;
   private lastFrameTime = 0;
   private unbindInput: () => void;
+
+  private particles: Particle[] = [];
+  private popups: ScorePopup[] = [];
+  private shake: CameraShakeState = createCameraShakeState();
+  private trailTimer = 0;
 
   constructor(canvas: HTMLCanvasElement, hud: { score: HTMLElement; multiplier: HTMLElement; overlay: HTMLElement }) {
     const ctx = canvas.getContext("2d");
@@ -118,6 +144,10 @@ export class Game {
     this.spawnTimer = 1;
     this.gameOver = false;
     resetObstacleIds();
+    this.particles = [];
+    this.popups = [];
+    this.shake = createCameraShakeState();
+    this.trailTimer = 0;
     this.overlayEl.innerHTML = "";
   }
 
@@ -137,6 +167,10 @@ export class Game {
     this.speed = Math.min(MAX_SPEED, this.speed + SPEED_RAMP_PER_SEC * dt);
     this.player = tickPlayer(this.player, dt);
     this.style = tickDecay(this.style, dt);
+    this.shake = tickShake(this.shake, dt);
+    this.particles = advanceParticles(this.particles, dt);
+    this.popups = advancePopups(this.popups, dt);
+    this.emitTrail(dt);
 
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
@@ -149,6 +183,16 @@ export class Game {
 
     this.scoreEl.textContent = `Score: ${totalScore(this.style, this.distance)}`;
     this.multiplierEl.textContent = `x${this.style.multiplier.toFixed(1)}`;
+  }
+
+  /** Leaves a faint trail behind the player, on a timer so it reads as a
+   * steady streak rather than one particle per frame. */
+  private emitTrail(dt: number): void {
+    this.trailTimer -= dt;
+    if (this.trailTimer > 0) return;
+    this.trailTimer = EFFECTS_CONFIG.trailInterval;
+    const y = laneCenterY(this.player.lane) + (this.player.aerial === "jumping" ? -60 : 0);
+    this.particles.push(spawnTrailParticle(PLAYER_X - 20, y, PLAYER_TRAIL_COLOR));
   }
 
   private resolveCollisions(): void {
@@ -164,7 +208,7 @@ export class Game {
         const elapsed = this.clock - this.player.lastLaneChangeAt;
         if (elapsed <= DODGE_RELEVANCE_WINDOW) {
           const tightness = Math.max(0, 1 - elapsed / DODGE_RELEVANCE_WINDOW);
-          this.style = landTrick(this.style, "laneDodge", tightness);
+          this.applyTrick("laneDodge", tightness);
         }
         continue;
       }
@@ -173,9 +217,9 @@ export class Game {
       const needsSlide = SLIDE_TYPES.includes(obstacle.type);
 
       if (needsJump && this.player.aerial === "jumping") {
-        this.style = landTrick(this.style, "jump");
+        this.applyTrick("jump");
       } else if (needsSlide && this.player.aerial === "sliding") {
-        this.style = landTrick(this.style, "slide");
+        this.applyTrick("slide");
       } else {
         this.endRun();
         return;
@@ -183,9 +227,23 @@ export class Game {
     }
   }
 
+  /** Lands a trick and punctuates it with a spark burst and a floating
+   * score popup at the player's position — the "juice" that sells a
+   * stylish move beyond the raw multiplier number. */
+  private applyTrick(trick: "laneDodge" | "jump" | "slide", tightness = 1): void {
+    const before = this.style.styleScore;
+    this.style = landTrick(this.style, trick, tightness);
+    const gained = this.style.styleScore - before;
+
+    const y = laneCenterY(this.player.lane) + (this.player.aerial === "jumping" ? -60 : 0);
+    this.particles.push(...spawnBurst(PLAYER_X, y, TRICK_BURST_COLOR));
+    this.popups.push(spawnScorePopup(PLAYER_X, y - 30, gained));
+  }
+
   private endRun(): void {
     this.gameOver = true;
     this.style = crashStyleScore(this.style);
+    this.shake = triggerShake(this.shake, CRASH_SHAKE_TRAUMA);
     const finalScore = totalScore(this.style, this.distance);
     this.overlayEl.innerHTML = `<div class="panel"><h2>Wiped out!</h2><p>Score: ${finalScore}</p><button type="button" data-restart>Run again (Jump)</button></div>`;
     const button = this.overlayEl.querySelector<HTMLButtonElement>("[data-restart]");
@@ -196,11 +254,45 @@ export class Game {
     const { ctx } = this;
     ctx.clearRect(0, 0, 800, 450);
 
+    ctx.save();
+    const offset = shakeOffset(this.shake);
+    ctx.translate(offset.x, offset.y);
+
+    this.renderEnvironment();
+    this.renderObstacles();
+    this.renderParticles();
+    this.renderPlayer();
+    this.renderPopups();
+
+    ctx.restore();
+  }
+
+  private renderEnvironment(): void {
+    const { ctx } = this;
     for (let lane = 0; lane < 3; lane++) {
       ctx.fillStyle = lane % 2 === 0 ? "#20243a" : "#252a44";
       ctx.fillRect(0, LANE_TOP + lane * LANE_HEIGHT, 800, LANE_HEIGHT);
     }
 
+    // Scrolling lane-divider dashes sell forward speed even on the flat
+    // lane backgrounds above.
+    ctx.strokeStyle = "rgba(244, 240, 255, 0.15)";
+    ctx.lineWidth = 3;
+    ctx.setLineDash([28, 22]);
+    const scroll = -((this.distance * 0.6) % 50);
+    for (let lane = 1; lane < 3; lane++) {
+      const y = LANE_TOP + lane * LANE_HEIGHT;
+      ctx.beginPath();
+      ctx.lineDashOffset = scroll;
+      ctx.moveTo(0, y);
+      ctx.lineTo(800, y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  private renderObstacles(): void {
+    const { ctx } = this;
     for (const obstacle of this.obstacles) {
       if (obstacle.lane === FULL_WIDTH_LANE) {
         const trackTop = LANE_TOP;
@@ -223,16 +315,76 @@ export class Game {
       const height = obstacle.type === "barrier" ? 40 : 70;
       ctx.fillRect(obstacle.x - 20, y - height / 2, 40, height);
     }
+  }
 
+  private renderParticles(): void {
+    const { ctx } = this;
+    for (const particle of this.particles) {
+      const alpha = particle.life / particle.maxLife;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = particle.color;
+      ctx.beginPath();
+      ctx.arc(particle.x, particle.y, particle.size * alpha, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  private renderPlayer(): void {
+    const { ctx } = this;
     const baseY = laneCenterY(this.player.lane);
+    let width = 44;
     let height = 80;
     let yOffset = 0;
+
     if (this.player.aerial === "jumping") {
-      yOffset = -60;
+      // Sine arc over the jump's duration reads as a real hop rather than
+      // a flat teleport up and down.
+      const progress = 1 - this.player.aerialTimer / JUMP_DURATION;
+      yOffset = -Math.sin(progress * Math.PI) * 70;
+      height = 70;
     } else if (this.player.aerial === "sliding") {
       height = 40;
+      width = 54;
+    } else {
+      // Idle run cycle: a small bob keeps the character feeling alive
+      // between tricks.
+      yOffset = -Math.abs(Math.sin(this.clock * 9)) * 4;
     }
+
+    const top = baseY - height / 2 + yOffset;
+
+    // Cape trails behind the body — longer at speed, tucked in on a slide —
+    // to give the ninja-princess silhouette some motion read.
+    const capeLength = this.player.aerial === "sliding" ? 14 : 26;
+    ctx.fillStyle = "#c1121f";
+    ctx.beginPath();
+    ctx.moveTo(PLAYER_X - width / 2, top + 6);
+    ctx.lineTo(PLAYER_X - width / 2 - capeLength, top + height / 2);
+    ctx.lineTo(PLAYER_X - width / 2, top + height - 6);
+    ctx.closePath();
+    ctx.fill();
+
     ctx.fillStyle = "#f4f0ff";
-    ctx.fillRect(PLAYER_X - 22, baseY - height / 2 + yOffset, 44, height);
+    ctx.fillRect(PLAYER_X - width / 2, top, width, height);
+
+    // Head accent so the sprite reads top-to-bottom instead of as a slab.
+    ctx.fillStyle = "#ffd166";
+    ctx.beginPath();
+    ctx.arc(PLAYER_X, top + 10, 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private renderPopups(): void {
+    const { ctx } = this;
+    ctx.font = "bold 20px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    for (const popup of this.popups) {
+      ctx.globalAlpha = popup.life / popup.maxLife;
+      ctx.fillStyle = "#ffd166";
+      ctx.fillText(popup.text, popup.x, popup.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = "left";
   }
 }

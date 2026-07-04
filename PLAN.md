@@ -38,9 +38,12 @@ CI, and automation (shootemup, Vacuum Empire, Pokie Palace all follow this):
    checklist, device testing.
 
 ## Status
-Planning stage — repo currently has no code beyond this plan. Logged in the
-Notion brain (Project Tracker + Projects hub) as Status: Research.
+Milestones 1-2 done (prototype loop + Style Score, content pass with hazard
+variety/patterns/difficulty ramp). Milestone 3 (art & feel) has its first
+pass in: camera shake on crash, particle trail + trick-landing spark burst,
+floating score popups, a scrolling-dash environment cue, and a simple
+procedural player animation (run bob, jump arc, cape/head silhouette).
 
 ## Next step
-Scaffold the TS + Vite project and implement the core run/jump/slide loop
-with a first working version of the Style Score formula.
+Continue milestone 3 — real character/environment art direction — then move
+to milestone 4 (meta progression: currency, cosmetic unlocks, run modifiers).
