@@ -35,6 +35,19 @@ import {
   tickPlayer,
 } from "./player";
 import {
+  COSMETICS,
+  CosmeticId,
+  ProgressionState,
+  activeCosmetic,
+  awardCurrency,
+  currencyForRun,
+  equipCosmetic,
+  isUnlocked,
+  loadProgression,
+  saveProgression,
+  unlockCosmetic,
+} from "./progression";
+import {
   STYLE_SCORE_CONFIG,
   StyleScoreState,
   createStyleScoreState,
@@ -59,7 +72,8 @@ const DODGE_RELEVANCE_WINDOW = 1.2;
  * without throwing the whole scene around. */
 const CRASH_SHAKE_TRAUMA = 0.8;
 const TRICK_BURST_COLOR = "#ffd166";
-const PLAYER_TRAIL_COLOR = "#7b61ff";
+/** Cosmetic being sold in the game-over shop — the only unlockable so far. */
+const SHOP_COSMETIC: CosmeticId = "goldTrail";
 
 function laneCenterY(lane: number): number {
   return LANE_TOP + lane * LANE_HEIGHT + LANE_HEIGHT / 2;
@@ -77,6 +91,7 @@ function spawnIntervalRange(distance: number): [number, number] {
 export class Game {
   private ctx: CanvasRenderingContext2D;
   private scoreEl: HTMLElement;
+  private coinsEl: HTMLElement;
   private multiplierEl: HTMLElement;
   private overlayEl: HTMLElement;
 
@@ -96,13 +111,23 @@ export class Game {
   private shake: CameraShakeState = createCameraShakeState();
   private trailTimer = 0;
 
-  constructor(canvas: HTMLCanvasElement, hud: { score: HTMLElement; multiplier: HTMLElement; overlay: HTMLElement }) {
+  /** Meta progression (currency + cosmetics) — persists across runs and
+   * across page loads, unlike the rest of the run-scoped state above. */
+  private progression: ProgressionState;
+
+  constructor(
+    canvas: HTMLCanvasElement,
+    hud: { score: HTMLElement; coins: HTMLElement; multiplier: HTMLElement; overlay: HTMLElement },
+  ) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D context unavailable");
     this.ctx = ctx;
     this.scoreEl = hud.score;
+    this.coinsEl = hud.coins;
     this.multiplierEl = hud.multiplier;
     this.overlayEl = hud.overlay;
+    this.progression = loadProgression(window.localStorage);
+    this.coinsEl.textContent = `🪙 ${this.progression.currency}`;
     this.unbindInput = bindInput((action) => this.handleAction(action));
   }
 
@@ -209,7 +234,7 @@ export class Game {
     if (this.trailTimer > 0) return;
     this.trailTimer = EFFECTS_CONFIG.trailInterval;
     const y = laneCenterY(this.player.lane) + (this.player.aerial === "jumping" ? -60 : 0);
-    this.particles.push(spawnTrailParticle(PLAYER_X - 20, y, PLAYER_TRAIL_COLOR));
+    this.particles.push(spawnTrailParticle(PLAYER_X - 20, y, activeCosmetic(this.progression).trailColor));
   }
 
   private resolveCollisions(): void {
@@ -261,10 +286,49 @@ export class Game {
     this.gameOver = true;
     this.style = crashStyleScore(this.style);
     this.shake = triggerShake(this.shake, CRASH_SHAKE_TRAUMA);
+
     const finalScore = totalScore(this.style, this.distance);
-    this.overlayEl.innerHTML = `<div class="panel"><h2>Wiped out!</h2><p>Score: ${finalScore}</p><button type="button" data-restart>Run again (Jump)</button></div>`;
-    const button = this.overlayEl.querySelector<HTMLButtonElement>("[data-restart]");
-    button?.addEventListener("click", () => this.restart());
+    const earned = currencyForRun(finalScore);
+    this.progression = awardCurrency(this.progression, earned);
+    saveProgression(window.localStorage, this.progression);
+
+    this.renderGameOverOverlay(finalScore, earned);
+  }
+
+  /** Renders the game-over panel: final score, the currency just earned,
+   * a restart button, and a tiny shop for the run's one cosmetic unlock —
+   * re-called after a shop action so the panel reflects the new balance
+   * without re-awarding currency. */
+  private renderGameOverOverlay(finalScore: number, earned: number): void {
+    this.coinsEl.textContent = `🪙 ${this.progression.currency}`;
+
+    const cost = COSMETICS[SHOP_COSMETIC].cost;
+    const unlocked = isUnlocked(this.progression, SHOP_COSMETIC);
+    const equipped = this.progression.equipped === SHOP_COSMETIC;
+    const shopHtml = unlocked
+      ? `<button type="button" data-equip>${equipped ? "Switch to Classic" : "Equip Gold Trail"}</button>`
+      : `<button type="button" data-unlock ${this.progression.currency >= cost ? "" : "disabled"}>Unlock Gold Trail (🪙${cost})</button>`;
+
+    this.overlayEl.innerHTML = `
+      <div class="panel">
+        <h2>Wiped out!</h2>
+        <p>Score: ${finalScore}</p>
+        <p class="currency-earned">+${earned} 🪙 (total ${this.progression.currency})</p>
+        <button type="button" data-restart>Run again (Jump)</button>
+        ${shopHtml}
+      </div>`;
+
+    this.overlayEl.querySelector<HTMLButtonElement>("[data-restart]")?.addEventListener("click", () => this.restart());
+    this.overlayEl.querySelector<HTMLButtonElement>("[data-unlock]")?.addEventListener("click", () => {
+      this.progression = unlockCosmetic(this.progression, SHOP_COSMETIC);
+      saveProgression(window.localStorage, this.progression);
+      this.renderGameOverOverlay(finalScore, earned);
+    });
+    this.overlayEl.querySelector<HTMLButtonElement>("[data-equip]")?.addEventListener("click", () => {
+      this.progression = equipCosmetic(this.progression, equipped ? "default" : SHOP_COSMETIC);
+      saveProgression(window.localStorage, this.progression);
+      this.renderGameOverOverlay(finalScore, earned);
+    });
   }
 
   private render(): void {
@@ -416,7 +480,7 @@ export class Game {
     // Cape trails behind the body — longer at speed, tucked in on a slide —
     // to give the ninja-princess silhouette some motion read.
     const capeLength = this.player.aerial === "sliding" ? 14 : 26;
-    ctx.fillStyle = "#c1121f";
+    ctx.fillStyle = activeCosmetic(this.progression).capeColor;
     ctx.beginPath();
     ctx.moveTo(PLAYER_X - width / 2, top + 6);
     ctx.lineTo(PLAYER_X - width / 2 - capeLength, top + height / 2);

@@ -37,7 +37,8 @@ canvas {
   pointer-events: none;
 }
 
-#multiplier {
+#multiplier,
+#coins {
   color: #ffd166;
 }
 
@@ -63,12 +64,23 @@ canvas {
   pointer-events: auto;
 }
 
+#overlay .currency-earned {
+  color: #ffd166;
+  font-weight: 600;
+}
+
 #overlay button {
-  margin-top: 12px;
+  display: block;
+  margin: 12px auto 0;
   padding: 8px 20px;
   font-size: 1rem;
   border-radius: 6px;
   border: none;
   background: #ffd166;
   cursor: pointer;
+}
+
+#overlay button:disabled {
+  background: #7a7460;
+  cursor: not-allowed;
 }
