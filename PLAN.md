@@ -75,10 +75,19 @@ of every run by 1.25x). Both share the existing perk shop wiring — six
 permanent-perk-or-cosmetic purchases now sit alongside the two consumable
 charms.
 
+With eight purchasable items now crammed into the shop, it got a small
+differentiation pass: the flat undifferentiated button row was split into
+two labeled sections — "Cosmetics" (looks only) and "Run Modifiers" (the
+Second Wind charm plus every permanent perk) — so the panel stays scannable
+as it grows. Verified visually via a rendered screenshot of the start
+screen. Purchase costs themselves were reviewed and already scale sensibly
+with each perk's long-run power (comboWindow < headStart < steadyPace <
+goldRush), so no cost changes were needed.
+
 ## Next step
 - Milestone 3 still needs real sprite/character art (an asset pipeline or
   drawn character sheet) to replace the placeholder rectangle — a design
   asset task rather than a code task.
-- Milestone 4 could still grow further: more perks, or a rebalance pass now
-  that six modifiers exist alongside cosmetics and charms — worth checking
-  whether costs/effects are properly differentiated as the shop grows.
+- Milestone 4's shop is feature-rich now (3 cosmetics, 1 charm, 4 perks);
+  further growth should probably shift toward Milestone 5 (Capacitor
+  Android packaging) rather than adding more shop items indefinitely.

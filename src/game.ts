@@ -373,18 +373,20 @@ export class Game {
     return `<button type="button" data-buy-perk="${id}" ${afford ? "" : "disabled"}>${meta.name} (🪙${meta.cost})</button>`;
   }
 
-  /** Shop markup shared by the start screen and the game-over panel: every
-   * cosmetic's unlock/equip button, the Second Wind charm purchase, and the
-   * permanent run-modifier perks. */
+  /** Shop markup shared by the start screen and the game-over panel, split
+   * into labeled sections — Cosmetics (looks only) and Run Modifiers (the
+   * charm plus every permanent perk) — so the panel stays scannable now
+   * that it holds eight purchasable items instead of the original three. */
   private renderShopHtml(): string {
     const charmCost = PROGRESSION_CONFIG.secondWindCost;
     const canAffordCharm = this.progression.currency >= charmCost;
     const cosmeticButtons = SHOP_COSMETICS.map((id) => this.cosmeticShopButtonHtml(id)).join("");
     const perkButtons = SHOP_PERKS.map((id) => this.perkShopButtonHtml(id)).join("");
     return `
-      <p class="shop-label">Shop</p>
+      <p class="shop-label">Cosmetics</p>
+      <div class="shop-row">${cosmeticButtons}</div>
+      <p class="shop-label">Run Modifiers</p>
       <div class="shop-row">
-        ${cosmeticButtons}
         <button type="button" data-buy-charm ${canAffordCharm ? "" : "disabled"}>
           Second Wind 🛡×${this.progression.charms} (🪙${charmCost})
         </button>
