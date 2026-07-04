@@ -1,0 +1,144 @@
+name: Auto-merge feature branches
+
+# When a feature/claude branch is pushed, open a PR to main (if missing), wait
+# for the CI workflow to finish on this exact commit, and merge only
+# if it succeeded.
+#
+# This job runs on GitHub's runners using the built-in GITHUB_TOKEN, so it is
+# NOT subject to the api.github.com restriction that affects local agents.
+#
+# Why this waits explicitly instead of using `gh pr merge --auto`:
+# GitHub's native auto-merge only *waits* for a check if that check is marked
+# "required" via branch protection on main. Without that repo-settings step
+# (which this workflow can't configure for you), `gh pr merge --auto` merges
+# the instant the PR is mergeable — i.e. immediately, before CI has even
+# started. Also, PRs this workflow opens are created with GITHUB_TOKEN, and
+# GitHub Actions never triggers other workflows (including ci.yml's
+# pull_request trigger) from a GITHUB_TOKEN-caused event — so relying on the
+# pull_request-triggered run would wait forever. ci.yml now also
+# triggers on `push` for claude/**/level* branches, so a real CI run exists
+# for this exact commit independent of PR creation; this workflow polls for
+# that run and gates the merge on its conclusion, fail-closed (no run /
+# no success => PR stays open, not merged).
+#
+# One-time activation (repo Settings):
+#   - Settings -> Actions -> General -> Workflow permissions ->
+#       "Allow GitHub Actions to create and approve pull requests" (ON)
+#   - Repo must allow squash merges (Settings -> General -> Pull Requests).
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: auto-merge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  open-pr-and-merge-when-green:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine whether this push needs a CI gate
+        id: needs_ci
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          BASE=$(git merge-base origin/main HEAD || echo "")
+          if [ -z "$BASE" ]; then
+            echo "Could not compute a merge-base against main; defaulting to CI required."
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE" HEAD | grep -qvE '\.md$'; then
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only markdown files changed since main; skipping the CI wait."
+            echo "required=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for CI to complete on this commit
+        if: steps.needs_ci.outputs.required == 'true'
+        id: wait_ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA}"
+          BRANCH="${GITHUB_REF_NAME}"
+          echo "Waiting for an CI run on commit $SHA (branch $BRANCH)..."
+          CONCLUSION=""
+          for i in $(seq 1 80); do
+            RUN_JSON=$(gh run list --workflow=ci.yml --branch "$BRANCH" --json headSha,status,conclusion --limit 10)
+            MATCH=$(echo "$RUN_JSON" | jq -c --arg sha "$SHA" '[.[] | select(.headSha == $sha)] | first // empty')
+            if [ -n "$MATCH" ]; then
+              STATUS=$(echo "$MATCH" | jq -r '.status')
+              if [ "$STATUS" = "completed" ]; then
+                CONCLUSION=$(echo "$MATCH" | jq -r '.conclusion // ""')
+                echo "CI completed with conclusion: $CONCLUSION"
+                break
+              fi
+              echo "Attempt $i/80: CI status=$STATUS — waiting 15s..."
+            else
+              echo "Attempt $i/80: no CI run found yet for $SHA — waiting 15s..."
+            fi
+            sleep 15
+          done
+          echo "conclusion=${CONCLUSION:-timeout}" >> "$GITHUB_OUTPUT"
+
+      - name: Open PR (if missing)
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BRANCH="${GITHUB_REF_NAME}"
+          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            echo "No open PR for $BRANCH — creating one."
+            TITLE=$(git log -1 --pretty=%s)
+            gh pr create --head "$BRANCH" --base main --title "$TITLE" --body "Automated PR for \`$BRANCH\`. Merges to main once CI is green." || true
+            PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          else
+            echo "Existing open PR #$PR for $BRANCH."
+          fi
+          if [ -z "$PR" ]; then
+            echo "::warning::Could not determine a PR number; ensure 'Allow GitHub Actions to create and approve pull requests' is enabled."
+            exit 0
+          fi
+          echo "number=$PR" >> "$GITHUB_OUTPUT"
+
+      - name: Merge once CI is green (or skip the gate for docs-only changes)
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PR="${{ steps.pr.outputs.number }}"
+          REQUIRED="${{ steps.needs_ci.outputs.required }}"
+          CONCLUSION="${{ steps.wait_ci.outputs.conclusion }}"
+
+          if [ "$REQUIRED" = "false" ]; then
+            echo "Docs-only change; merging without a CI gate."
+          elif [ "$CONCLUSION" = "success" ]; then
+            echo "CI green — merging PR #$PR."
+          else
+            echo "::error::CI did not succeed (conclusion: ${CONCLUSION:-unknown}) — leaving PR #$PR open. NOT merging."
+            gh pr comment "$PR" --body "🚫 Merge blocked: CI did not complete successfully on this commit (conclusion: \`${CONCLUSION:-unknown}\`). Leaving this PR open for manual review." || true
+            exit 1
+          fi
+
+          if gh pr merge "$PR" --squash; then
+            echo "Merged PR #$PR."
+          else
+            echo "::warning::Could not merge PR #$PR. Check repo settings (merge permissions / squash-merge allowed)."
+            exit 1
+          fi

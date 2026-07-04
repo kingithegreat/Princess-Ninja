@@ -1,0 +1,28 @@
+name: CI
+
+# Typecheck + test + production build gate for Princess Ninja. Runs on every
+# push to main and to claude/** branches (so auto-merge.yml has a real run to
+# poll on the exact SHA — see that file's header for why), plus manual
+# dispatch.
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  typecheck-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
