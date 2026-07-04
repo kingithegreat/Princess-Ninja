@@ -92,15 +92,13 @@ copies it into the Android project; `npm run android:build` additionally
 runs the Gradle debug build. A separate `android.yml` CI workflow builds and
 uploads the debug APK — scoped to `main` pushes and manual dispatch (not
 every `claude/**` push) since the Gradle build needs a full Android SDK and
-network access to `dl.google.com`/`services.gradle.org` that this sandboxed
-dev session's egress policy blocks, so it couldn't be verified locally; it
-runs for real once this branch merges to `main`, where GitHub's hosted
-runners have the Android SDK preinstalled.
+network access to `dl.google.com`/`services.gradle.org` that the sandboxed
+dev session's egress policy blocks, so it couldn't be verified locally.
+Verified for real via a manual `workflow_dispatch` run on `main` after
+merge: `gradlew assembleDebug` succeeded on GitHub's hosted runner and
+uploaded a working `princess-ninja-debug-apk` artifact (~3.6MB).
 
 ## Next step
-- Verify the `android.yml` workflow actually goes green on `main` post-merge
-  (unverified locally — see above) and fix anything the real Gradle build
-  surfaces that the sandbox couldn't catch.
 - Milestone 5 still needs: an app icon/splash screen (currently Capacitor's
   generic placeholders), a release (signed) build + keystore management
   instead of just the debug APK, and a check that the fixed 800x450 canvas
