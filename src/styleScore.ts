@@ -41,11 +41,13 @@ export function tickDecay(state: StyleScoreState, dtSeconds: number): StyleScore
 }
 
 /** A stylish move landed. `tightness` (0-1) scales the near-miss bonus by
- * how close the dodge was — tighter dodges are worth more. */
+ * how close the dodge was — tighter dodges are worth more. `comboWindowSeconds`
+ * defaults to the base config but can be extended by a purchased perk. */
 export function landTrick(
   state: StyleScoreState,
   trick: TrickType,
   tightness = 1,
+  comboWindowSeconds: number = STYLE_SCORE_CONFIG.comboWindowSeconds,
 ): StyleScoreState {
   const bonus = trick === "laneDodge" ? 1 + STYLE_SCORE_CONFIG.tightDodgeBonus * tightness : 1;
   const pointsEarned = STYLE_SCORE_CONFIG.basePoints * state.multiplier * bonus;
@@ -56,7 +58,7 @@ export function landTrick(
   return {
     multiplier: nextMultiplier,
     styleScore: state.styleScore + pointsEarned,
-    comboTimer: STYLE_SCORE_CONFIG.comboWindowSeconds,
+    comboTimer: comboWindowSeconds,
   };
 }
 

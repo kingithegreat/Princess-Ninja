@@ -59,9 +59,18 @@ after every crash's "Run again") lets you spend banked currency before
 committing to the next run, sharing the same shop markup/listener wiring
 as the game-over panel.
 
+Milestone 4 grew two more run modifiers alongside Second Wind: Head Start
+(a one-time shop purchase that banks 1200px of distance at the start of
+every future run, at the cost of skipping straight into twin-lane hazards
+instead of the gentle opening) and Forgiving Combo (a one-time purchase
+that extends the combo window by a second on every landed trick). Both are
+permanent once bought — unlike charms, they don't need repurchasing — and
+share the existing shop panel/listener wiring.
+
 ## Next step
 - Milestone 3 still needs real sprite/character art (an asset pipeline or
   drawn character sheet) to replace the placeholder rectangle — a design
   asset task rather than a code task.
-- Milestone 4 could still grow more run modifiers beyond Second Wind (e.g.
-  a currency-bought head start, a forgiving-combo-window perk).
+- Milestone 4 could still grow further: more perks (e.g. a slower
+  difficulty ramp, a starting currency multiplier), or a rebalance pass now
+  that four modifiers exist alongside cosmetics.

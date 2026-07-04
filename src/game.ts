@@ -37,16 +37,21 @@ import {
 import {
   COSMETICS,
   CosmeticId,
+  PERKS,
+  PerkId,
   PROGRESSION_CONFIG,
   ProgressionState,
   SHOP_COSMETICS,
+  SHOP_PERKS,
   activeCosmetic,
   awardCurrency,
   buyCharm,
+  buyPerk,
   consumeCharm,
   currencyForRun,
   equipCosmetic,
   hasCharm,
+  hasPerk,
   isUnlocked,
   loadProgression,
   saveProgression,
@@ -203,7 +208,7 @@ export class Game {
     this.player = createPlayerState();
     this.obstacles = [];
     this.style = createStyleScoreState();
-    this.distance = 0;
+    this.distance = hasPerk(this.progression, "headStart") ? PERKS.headStart.startDistance : 0;
     this.speed = BASE_SPEED;
     this.clock = 0;
     this.spawnTimer = 1;
@@ -319,8 +324,10 @@ export class Game {
    * score popup at the player's position — the "juice" that sells a
    * stylish move beyond the raw multiplier number. */
   private applyTrick(trick: "laneDodge" | "jump" | "slide", tightness = 1): void {
+    const comboWindow = STYLE_SCORE_CONFIG.comboWindowSeconds +
+      (hasPerk(this.progression, "comboWindow") ? PERKS.comboWindow.bonusSeconds : 0);
     const before = this.style.styleScore;
-    this.style = landTrick(this.style, trick, tightness);
+    this.style = landTrick(this.style, trick, tightness, comboWindow);
     const gained = this.style.styleScore - before;
 
     const y = laneCenterY(this.player.lane) + (this.player.aerial === "jumping" ? -60 : 0);
@@ -353,12 +360,25 @@ export class Game {
     return `<button type="button" data-equip="${id}">${equipped ? "Switch to Classic" : `Equip ${meta.name}`}</button>`;
   }
 
+  /** One perk's shop button: a one-time purchase that stays owned forever
+   * once bought, unlike the consumable Second Wind charm. */
+  private perkShopButtonHtml(id: PerkId): string {
+    const meta = PERKS[id];
+    if (hasPerk(this.progression, id)) {
+      return `<button type="button" disabled>${meta.name} owned</button>`;
+    }
+    const afford = this.progression.currency >= meta.cost;
+    return `<button type="button" data-buy-perk="${id}" ${afford ? "" : "disabled"}>${meta.name} (🪙${meta.cost})</button>`;
+  }
+
   /** Shop markup shared by the start screen and the game-over panel: every
-   * cosmetic's unlock/equip button plus the Second Wind charm purchase. */
+   * cosmetic's unlock/equip button, the Second Wind charm purchase, and the
+   * permanent run-modifier perks. */
   private renderShopHtml(): string {
     const charmCost = PROGRESSION_CONFIG.secondWindCost;
     const canAffordCharm = this.progression.currency >= charmCost;
     const cosmeticButtons = SHOP_COSMETICS.map((id) => this.cosmeticShopButtonHtml(id)).join("");
+    const perkButtons = SHOP_PERKS.map((id) => this.perkShopButtonHtml(id)).join("");
     return `
       <p class="shop-label">Shop</p>
       <div class="shop-row">
@@ -366,6 +386,7 @@ export class Game {
         <button type="button" data-buy-charm ${canAffordCharm ? "" : "disabled"}>
           Second Wind 🛡×${this.progression.charms} (🪙${charmCost})
         </button>
+        ${perkButtons}
       </div>`;
   }
 
@@ -394,6 +415,14 @@ export class Game {
       this.progression = buyCharm(this.progression);
       saveProgression(window.localStorage, this.progression);
       rerender();
+    });
+    this.overlayEl.querySelectorAll<HTMLButtonElement>("[data-buy-perk]").forEach((button) => {
+      const id = button.dataset.buyPerk as PerkId;
+      button.addEventListener("click", () => {
+        this.progression = buyPerk(this.progression, id);
+        saveProgression(window.localStorage, this.progression);
+        rerender();
+      });
     });
   }
 

@@ -28,15 +28,44 @@ export const PROGRESSION_CONFIG = {
   secondWindCost: 150,
 } as const;
 
+/** One-time permanent run modifiers — bought once from the shop, then
+ * always active on every future run (unlike Second Wind charms, which are
+ * consumed on use and must be rebought). */
+export const PERKS = {
+  headStart: {
+    id: "headStart",
+    name: "Head Start",
+    cost: 400,
+    /** Distance (px) the run begins at instead of 0 — banks a chunk of
+     * distance score immediately, at the cost of skipping straight past
+     * the gentle single-obstacle opening into twin-lane hazards. */
+    startDistance: 1200,
+  },
+  comboWindow: {
+    id: "comboWindow",
+    name: "Forgiving Combo",
+    cost: 350,
+    /** Extra seconds added to the combo window on every landed trick —
+     * more breathing room before the multiplier starts decaying. */
+    bonusSeconds: 1,
+  },
+} as const;
+
+export type PerkId = keyof typeof PERKS;
+
+/** Perks offered in the shop, in display order. */
+export const SHOP_PERKS: PerkId[] = ["headStart", "comboWindow"];
+
 export interface ProgressionState {
   currency: number;
   unlocked: CosmeticId[];
   equipped: CosmeticId;
   charms: number;
+  perks: PerkId[];
 }
 
 export function createProgressionState(): ProgressionState {
-  return { currency: 0, unlocked: [], equipped: "default", charms: 0 };
+  return { currency: 0, unlocked: [], equipped: "default", charms: 0, perks: [] };
 }
 
 /** Loads saved progression, falling back to a fresh state on missing or
@@ -54,6 +83,9 @@ export function loadProgression(store: KeyValueStore): ProgressionState {
         : [],
       equipped: typeof parsed.equipped === "string" && parsed.equipped in COSMETICS ? parsed.equipped : "default",
       charms: typeof parsed.charms === "number" && parsed.charms >= 0 ? parsed.charms : 0,
+      perks: Array.isArray(parsed.perks)
+        ? parsed.perks.filter((id: unknown): id is PerkId => typeof id === "string" && id in PERKS)
+        : [],
     };
   } catch {
     return createProgressionState();
@@ -112,4 +144,17 @@ export function hasCharm(state: ProgressionState): boolean {
 export function consumeCharm(state: ProgressionState): ProgressionState {
   if (state.charms <= 0) return state;
   return { ...state, charms: state.charms - 1 };
+}
+
+export function hasPerk(state: ProgressionState, id: PerkId): boolean {
+  return state.perks.includes(id);
+}
+
+/** Buys a permanent run modifier perk. A no-op if already owned or if
+ * currency is insufficient. */
+export function buyPerk(state: ProgressionState, id: PerkId): ProgressionState {
+  if (hasPerk(state, id)) return state;
+  const cost = PERKS[id].cost;
+  if (state.currency < cost) return state;
+  return { ...state, currency: state.currency - cost, perks: [...state.perks, id] };
 }
