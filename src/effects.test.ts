@@ -6,6 +6,7 @@ import {
   createCameraShakeState,
   shakeOffset,
   spawnBurst,
+  spawnDust,
   spawnScorePopup,
   spawnTrailParticle,
   tickShake,
@@ -33,6 +34,15 @@ describe("particles", () => {
     for (const p of burst) {
       expect(p.x).toBe(10);
       expect(p.y).toBe(10);
+    }
+  });
+
+  it("spawns ground-hugging dust that drifts backward, shorter-lived than a trick burst", () => {
+    const dust = spawnDust(10, 10, () => 0.5);
+    expect(dust).toHaveLength(EFFECTS_CONFIG.dustCount);
+    for (const p of dust) {
+      expect(p.vx).toBeLessThan(0);
+      expect(p.maxLife).toBe(EFFECTS_CONFIG.dustLife);
     }
   });
 });

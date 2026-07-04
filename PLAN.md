@@ -39,11 +39,18 @@ CI, and automation (shootemup, Vacuum Empire, Pokie Palace all follow this):
 
 ## Status
 Milestones 1-2 done (prototype loop + Style Score, content pass with hazard
-variety/patterns/difficulty ramp). Milestone 3 (art & feel) has its first
-pass in: camera shake on crash, particle trail + trick-landing spark burst,
-floating score popups, a scrolling-dash environment cue, and a simple
-procedural player animation (run bob, jump arc, cape/head silhouette).
+variety/patterns/difficulty ramp). Milestone 3 (art & feel) is well underway:
+camera shake on crash, particle trail + trick-landing spark burst, floating
+score popups, dust puffs on jump takeoff/landing and slide starts, a
+multiplier-driven glow aura on the player that intensifies with the combo,
+a parallax dusk skyline + ground gradient environment theme, scrolling lane
+dashes, and procedural player animation (run bob, jump arc, cape/head
+silhouette). All still programmatic canvas art — no sprite/image assets yet.
 
 ## Next step
-Continue milestone 3 — real character/environment art direction — then move
-to milestone 4 (meta progression: currency, cosmetic unlocks, run modifiers).
+Milestone 3 has no remaining programmatic "juice" gaps of note; the next
+real step needs actual sprite/character art (an asset pipeline or drawn
+character sheet) to replace the placeholder rectangle, which is a design
+asset task rather than a code task. Until that's ready, move to milestone 4
+(meta progression: currency earned from style score, cosmetic unlocks, run
+modifiers).

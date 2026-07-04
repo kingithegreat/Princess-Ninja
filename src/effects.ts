@@ -30,6 +30,8 @@ export const EFFECTS_CONFIG = {
   popupRiseSpeed: 40,
   shakeDecayPerSecond: 2.5,
   shakeMaxOffsetPx: 14,
+  dustCount: 5,
+  dustLife: 0.3,
 } as const;
 
 export function spawnTrailParticle(x: number, y: number, color: string): Particle {
@@ -66,6 +68,28 @@ export function spawnBurst(
       maxLife: EFFECTS_CONFIG.burstLife,
       color,
       size: 3 + rng() * 3,
+    });
+  }
+  return particles;
+}
+
+/** Low, ground-hugging puff for a jump takeoff/landing or a slide start —
+ * a duller, slower cousin of `spawnBurst` that reads as dust rather than a
+ * spark of style. */
+export function spawnDust(x: number, y: number, rng: () => number = Math.random): Particle[] {
+  const particles: Particle[] = [];
+  for (let i = 0; i < EFFECTS_CONFIG.dustCount; i++) {
+    const angle = Math.PI + (rng() - 0.5) * Math.PI * 0.8;
+    const speed = 30 + rng() * 50;
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.4,
+      life: EFFECTS_CONFIG.dustLife,
+      maxLife: EFFECTS_CONFIG.dustLife,
+      color: "#9a917f",
+      size: 4 + rng() * 3,
     });
   }
   return particles;

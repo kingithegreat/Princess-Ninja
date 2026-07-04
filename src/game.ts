@@ -9,6 +9,7 @@ import {
   createCameraShakeState,
   shakeOffset,
   spawnBurst,
+  spawnDust,
   spawnScorePopup,
   spawnTrailParticle,
   tickShake,
@@ -34,6 +35,7 @@ import {
   tickPlayer,
 } from "./player";
 import {
+  STYLE_SCORE_CONFIG,
   StyleScoreState,
   createStyleScoreState,
   crash as crashStyleScore,
@@ -125,13 +127,26 @@ export class Game {
       case "right":
         this.player = moveLane(this.player, 1, this.clock);
         break;
-      case "jump":
+      case "jump": {
+        const wasRunning = this.player.aerial === "running";
         this.player = startJump(this.player);
+        if (wasRunning) this.spawnGroundDust();
         break;
-      case "slide":
+      }
+      case "slide": {
+        const wasRunning = this.player.aerial === "running";
         this.player = startSlide(this.player);
+        if (wasRunning) this.spawnGroundDust();
         break;
+      }
     }
+  }
+
+  /** Puff of dust at the player's feet — used for jump takeoffs, landings,
+   * and slide starts so ground contact reads as an impact. */
+  private spawnGroundDust(): void {
+    const y = laneCenterY(this.player.lane) + 40;
+    this.particles.push(...spawnDust(PLAYER_X - 10, y));
   }
 
   private restart(): void {
@@ -165,7 +180,9 @@ export class Game {
     this.clock += dt;
     this.distance += this.speed * dt;
     this.speed = Math.min(MAX_SPEED, this.speed + SPEED_RAMP_PER_SEC * dt);
+    const wasJumping = this.player.aerial === "jumping";
     this.player = tickPlayer(this.player, dt);
+    if (wasJumping && this.player.aerial === "running") this.spawnGroundDust();
     this.style = tickDecay(this.style, dt);
     this.shake = tickShake(this.shake, dt);
     this.particles = advanceParticles(this.particles, dt);
@@ -269,6 +286,23 @@ export class Game {
 
   private renderEnvironment(): void {
     const { ctx } = this;
+
+    // Dusk sky band above the track with a slow parallax rooftop skyline —
+    // gives the ninja-princess setting a place, not just a track.
+    const sky = ctx.createLinearGradient(0, 0, 0, LANE_TOP);
+    sky.addColorStop(0, "#241a3d");
+    sky.addColorStop(1, "#3a2a5c");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, 800, LANE_TOP);
+
+    ctx.fillStyle = "rgba(16, 18, 28, 0.6)";
+    const skylineScroll = (this.distance * 0.08) % 120;
+    for (let i = -1; i < 8; i++) {
+      const x = i * 120 - skylineScroll;
+      const roofHeight = 12 + ((i * 37) % 22);
+      ctx.fillRect(x, LANE_TOP - roofHeight, 60, roofHeight);
+    }
+
     for (let lane = 0; lane < 3; lane++) {
       ctx.fillStyle = lane % 2 === 0 ? "#20243a" : "#252a44";
       ctx.fillRect(0, LANE_TOP + lane * LANE_HEIGHT, 800, LANE_HEIGHT);
@@ -289,6 +323,14 @@ export class Game {
       ctx.stroke();
     }
     ctx.setLineDash([]);
+
+    // Ground band below the track, echoing the sky's dusk palette.
+    const groundTop = LANE_TOP + LANE_HEIGHT * 3;
+    const ground = ctx.createLinearGradient(0, groundTop, 0, 450);
+    ground.addColorStop(0, "#2a1f3a");
+    ground.addColorStop(1, "#15121f");
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, groundTop, 800, 450 - groundTop);
   }
 
   private renderObstacles(): void {
@@ -353,6 +395,23 @@ export class Game {
     }
 
     const top = baseY - height / 2 + yOffset;
+
+    // Glow aura scales with the style multiplier — the higher the combo,
+    // the more the character itself visibly reads as "on fire".
+    const heat = (this.style.multiplier - STYLE_SCORE_CONFIG.baseMultiplier) /
+      (STYLE_SCORE_CONFIG.maxMultiplier - STYLE_SCORE_CONFIG.baseMultiplier);
+    if (heat > 0) {
+      const cx = PLAYER_X;
+      const cy = top + height / 2;
+      const radius = 28 + heat * 40;
+      const gradient = ctx.createRadialGradient(cx, cy, 4, cx, cy, radius);
+      gradient.addColorStop(0, `rgba(255, 209, 102, ${0.25 + heat * 0.35})`);
+      gradient.addColorStop(1, "rgba(255, 209, 102, 0)");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Cape trails behind the body — longer at speed, tucked in on a slide —
     // to give the ninja-princess silhouette some motion read.
