@@ -67,10 +67,18 @@ that extends the combo window by a second on every landed trick). Both are
 permanent once bought — unlike charms, they don't need repurchasing — and
 share the existing shop panel/listener wiring.
 
+Milestone 4 grew two more perks on top of that: Steady Pace (a one-time
+purchase that slows the run's per-second speed ramp to 65% of normal, so
+max speed still hits eventually but the climb there is more forgiving) and
+Gold Rush (a one-time purchase that multiplies currency earned at the end
+of every run by 1.25x). Both share the existing perk shop wiring — six
+permanent-perk-or-cosmetic purchases now sit alongside the two consumable
+charms.
+
 ## Next step
 - Milestone 3 still needs real sprite/character art (an asset pipeline or
   drawn character sheet) to replace the placeholder rectangle — a design
   asset task rather than a code task.
-- Milestone 4 could still grow further: more perks (e.g. a slower
-  difficulty ramp, a starting currency multiplier), or a rebalance pass now
-  that four modifiers exist alongside cosmetics.
+- Milestone 4 could still grow further: more perks, or a rebalance pass now
+  that six modifiers exist alongside cosmetics and charms — worth checking
+  whether costs/effects are properly differentiated as the shop grows.

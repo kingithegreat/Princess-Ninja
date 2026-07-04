@@ -235,7 +235,8 @@ export class Game {
   private update(dt: number): void {
     this.clock += dt;
     this.distance += this.speed * dt;
-    this.speed = Math.min(MAX_SPEED, this.speed + SPEED_RAMP_PER_SEC * dt);
+    const rampMultiplier = hasPerk(this.progression, "steadyPace") ? PERKS.steadyPace.speedRampMultiplier : 1;
+    this.speed = Math.min(MAX_SPEED, this.speed + SPEED_RAMP_PER_SEC * rampMultiplier * dt);
     const wasJumping = this.player.aerial === "jumping";
     this.player = tickPlayer(this.player, dt);
     if (wasJumping && this.player.aerial === "running") this.spawnGroundDust();
@@ -341,7 +342,8 @@ export class Game {
     this.shake = triggerShake(this.shake, CRASH_SHAKE_TRAUMA);
 
     const finalScore = totalScore(this.style, this.distance);
-    const earned = currencyForRun(finalScore);
+    const currencyMultiplier = hasPerk(this.progression, "goldRush") ? PERKS.goldRush.currencyMultiplier : 1;
+    const earned = currencyForRun(finalScore, currencyMultiplier);
     this.progression = awardCurrency(this.progression, earned);
     saveProgression(window.localStorage, this.progression);
 
