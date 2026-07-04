@@ -84,10 +84,27 @@ screen. Purchase costs themselves were reviewed and already scale sensibly
 with each perk's long-run power (comboWindow < headStart < steadyPace <
 goldRush), so no cost changes were needed.
 
+Milestone 5 (mobile packaging) got its first pass: Capacitor is wired up
+(`@capacitor/core`, `@capacitor/android`, `@capacitor/cli`, `capacitor.config.ts`
+with appId `com.princessninja.app`) and the native `android/` Gradle project
+is scaffolded and committed. `npm run cap:sync` builds the web bundle and
+copies it into the Android project; `npm run android:build` additionally
+runs the Gradle debug build. A separate `android.yml` CI workflow builds and
+uploads the debug APK — scoped to `main` pushes and manual dispatch (not
+every `claude/**` push) since the Gradle build needs a full Android SDK and
+network access to `dl.google.com`/`services.gradle.org` that this sandboxed
+dev session's egress policy blocks, so it couldn't be verified locally; it
+runs for real once this branch merges to `main`, where GitHub's hosted
+runners have the Android SDK preinstalled.
+
 ## Next step
+- Verify the `android.yml` workflow actually goes green on `main` post-merge
+  (unverified locally — see above) and fix anything the real Gradle build
+  surfaces that the sandbox couldn't catch.
+- Milestone 5 still needs: an app icon/splash screen (currently Capacitor's
+  generic placeholders), a release (signed) build + keystore management
+  instead of just the debug APK, and a check that the fixed 800x450 canvas
+  scales sensibly on real device screens.
 - Milestone 3 still needs real sprite/character art (an asset pipeline or
   drawn character sheet) to replace the placeholder rectangle — a design
   asset task rather than a code task.
-- Milestone 4's shop is feature-rich now (3 cosmetics, 1 charm, 4 perks);
-  further growth should probably shift toward Milestone 5 (Capacitor
-  Android packaging) rather than adding more shop items indefinitely.

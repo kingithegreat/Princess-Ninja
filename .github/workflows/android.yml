@@ -1,0 +1,34 @@
+name: Android build
+
+# Builds the debug APK via Capacitor + Gradle. Kept separate from ci.yml
+# (which gates claude/** auto-merge) since this needs a full Android SDK
+# and isn't verifiable from a sandboxed dev session — scoped to main
+# pushes and manual dispatch so a flaky Android toolchain never blocks
+# feature-branch merges.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm run cap:sync
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: princess-ninja-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
