@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   KeyValueStore,
+  PERKS,
   PROGRESSION_CONFIG,
   PROGRESSION_STORAGE_KEY,
   activeCosmetic,
   awardCurrency,
   buyCharm,
+  buyPerk,
   consumeCharm,
   createProgressionState,
   currencyForRun,
   equipCosmetic,
   hasCharm,
+  hasPerk,
   isUnlocked,
   loadProgression,
   saveProgression,
@@ -28,12 +31,13 @@ function fakeStore(initial: Record<string, string> = {}): KeyValueStore {
 }
 
 describe("progression state", () => {
-  it("starts with no currency, no unlocks, no charms, and the default cosmetic equipped", () => {
+  it("starts with no currency, no unlocks, no charms, no perks, and the default cosmetic equipped", () => {
     const state = createProgressionState();
     expect(state.currency).toBe(0);
     expect(state.unlocked).toEqual([]);
     expect(state.equipped).toBe("default");
     expect(state.charms).toBe(0);
+    expect(state.perks).toEqual([]);
   });
 
   it("converts a run's total score into currency", () => {
@@ -131,6 +135,42 @@ describe("charms (Second Wind)", () => {
   });
 });
 
+describe("perks (Head Start / Forgiving Combo)", () => {
+  it("reports no perk owned by default", () => {
+    expect(hasPerk(createProgressionState(), "headStart")).toBe(false);
+  });
+
+  it("does not sell a perk without enough currency", () => {
+    const state = awardCurrency(createProgressionState(), 100);
+    const next = buyPerk(state, "headStart");
+    expect(hasPerk(next, "headStart")).toBe(false);
+    expect(next.currency).toBe(100);
+  });
+
+  it("sells a perk and deducts its cost when affordable", () => {
+    const state = awardCurrency(createProgressionState(), 400);
+    const next = buyPerk(state, "headStart");
+    expect(hasPerk(next, "headStart")).toBe(true);
+    expect(next.currency).toBe(400 - PERKS.headStart.cost);
+  });
+
+  it("does not double-charge for an already-owned perk", () => {
+    let state = awardCurrency(createProgressionState(), 1000);
+    state = buyPerk(state, "headStart");
+    const again = buyPerk(state, "headStart");
+    expect(again.currency).toBe(state.currency);
+  });
+
+  it("owns perks independently of one another", () => {
+    let state = awardCurrency(createProgressionState(), 1000);
+    state = buyPerk(state, "headStart");
+    expect(hasPerk(state, "comboWindow")).toBe(false);
+    state = buyPerk(state, "comboWindow");
+    expect(hasPerk(state, "headStart")).toBe(true);
+    expect(hasPerk(state, "comboWindow")).toBe(true);
+  });
+});
+
 describe("persistence", () => {
   it("returns a fresh state when nothing is stored yet", () => {
     const state = loadProgression(fakeStore());
@@ -144,10 +184,25 @@ describe("persistence", () => {
 
   it("round-trips a saved state", () => {
     const store = fakeStore();
-    let state = awardCurrency(createProgressionState(), 500);
+    let state = awardCurrency(createProgressionState(), 900);
     state = equipCosmetic(unlockCosmetic(state, "goldTrail"), "goldTrail");
+    state = buyPerk(state, "headStart");
     saveProgression(store, state);
     expect(loadProgression(store)).toEqual(state);
+  });
+
+  it("ignores an unknown perk id from stale or tampered data", () => {
+    const store = fakeStore({
+      [PROGRESSION_STORAGE_KEY]: JSON.stringify({
+        currency: 10,
+        unlocked: [],
+        equipped: "default",
+        charms: 0,
+        perks: ["notReal", "headStart"],
+      }),
+    });
+    const state = loadProgression(store);
+    expect(state.perks).toEqual(["headStart"]);
   });
 
   it("ignores an unknown equipped/unlocked cosmetic id from stale or tampered data", () => {

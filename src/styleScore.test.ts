@@ -39,6 +39,11 @@ describe("styleScore", () => {
     expect(tight.styleScore).toBeGreaterThan(loose.styleScore);
   });
 
+  it("uses a custom combo window when one is supplied", () => {
+    const state = landTrick(createStyleScoreState(), "jump", 1, STYLE_SCORE_CONFIG.comboWindowSeconds + 1);
+    expect(state.comboTimer).toBe(STYLE_SCORE_CONFIG.comboWindowSeconds + 1);
+  });
+
   it("does not decay the multiplier while inside the combo window", () => {
     const state = landTrick(createStyleScoreState(), "jump");
     const ticked = tickDecay(state, STYLE_SCORE_CONFIG.comboWindowSeconds - 0.1);
