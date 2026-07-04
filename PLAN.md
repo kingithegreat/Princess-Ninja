@@ -47,10 +47,17 @@ a parallax dusk skyline + ground gradient environment theme, scrolling lane
 dashes, and procedural player animation (run bob, jump arc, cape/head
 silhouette). All still programmatic canvas art — no sprite/image assets yet.
 
+Milestone 4 (meta progression) has its first pass in: a run's final score
+converts to currency, persisted to `localStorage`; a game-over shop sells
+one cosmetic unlock (a gold trail/cape recolor) that can be equipped and
+actually changes the player's rendered colors; a coins counter lives in the
+HUD.
+
 ## Next step
-Milestone 3 has no remaining programmatic "juice" gaps of note; the next
-real step needs actual sprite/character art (an asset pipeline or drawn
-character sheet) to replace the placeholder rectangle, which is a design
-asset task rather than a code task. Until that's ready, move to milestone 4
-(meta progression: currency earned from style score, cosmetic unlocks, run
-modifiers).
+Two directions, either is reasonable next:
+- Broaden milestone 4 — more cosmetics, run modifiers (e.g. a currency-
+  bought head start or forgiving-combo-window perk), a proper shop screen
+  instead of the inline game-over buttons.
+- Milestone 3 still needs real sprite/character art (an asset pipeline or
+  drawn character sheet) to replace the placeholder rectangle — a design
+  asset task rather than a code task.
