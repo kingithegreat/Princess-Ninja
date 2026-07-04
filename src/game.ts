@@ -37,11 +37,16 @@ import {
 import {
   COSMETICS,
   CosmeticId,
+  PROGRESSION_CONFIG,
   ProgressionState,
+  SHOP_COSMETICS,
   activeCosmetic,
   awardCurrency,
+  buyCharm,
+  consumeCharm,
   currencyForRun,
   equipCosmetic,
+  hasCharm,
   isUnlocked,
   loadProgression,
   saveProgression,
@@ -71,9 +76,15 @@ const DODGE_RELEVANCE_WINDOW = 1.2;
 /** How much camera trauma a crash adds — big enough to read as an impact
  * without throwing the whole scene around. */
 const CRASH_SHAKE_TRAUMA = 0.8;
+/** A charm save is a smaller jolt than a real crash — a close call, not
+ * a wipeout. */
+const CHARM_SAVE_SHAKE_TRAUMA = 0.4;
+/** How long a charm save keeps the player passing through hazards
+ * harmlessly, in seconds — long enough to clear the obstacle(s) that
+ * would otherwise have ended the run. */
+const CHARM_SAVE_INVULNERABILITY = 0.6;
 const TRICK_BURST_COLOR = "#ffd166";
-/** Cosmetic being sold in the game-over shop — the only unlockable so far. */
-const SHOP_COSMETIC: CosmeticId = "goldTrail";
+const CHARM_SAVE_BURST_COLOR = "#06d6a0";
 
 function laneCenterY(lane: number): number {
   return LANE_TOP + lane * LANE_HEIGHT + LANE_HEIGHT / 2;
@@ -92,6 +103,7 @@ export class Game {
   private ctx: CanvasRenderingContext2D;
   private scoreEl: HTMLElement;
   private coinsEl: HTMLElement;
+  private charmsEl: HTMLElement;
   private multiplierEl: HTMLElement;
   private overlayEl: HTMLElement;
 
@@ -110,25 +122,35 @@ export class Game {
   private popups: ScorePopup[] = [];
   private shake: CameraShakeState = createCameraShakeState();
   private trailTimer = 0;
+  /** Run clock timestamp until which hazards are passed through harmlessly
+   * — set by a Second Wind charm save. */
+  private invulnerableUntil = -Infinity;
 
-  /** Meta progression (currency + cosmetics) — persists across runs and
-   * across page loads, unlike the rest of the run-scoped state above. */
+  /** Meta progression (currency + cosmetics + charms) — persists across
+   * runs and across page loads, unlike the rest of the run-scoped state
+   * above. */
   private progression: ProgressionState;
 
   constructor(
     canvas: HTMLCanvasElement,
-    hud: { score: HTMLElement; coins: HTMLElement; multiplier: HTMLElement; overlay: HTMLElement },
+    hud: { score: HTMLElement; coins: HTMLElement; charms: HTMLElement; multiplier: HTMLElement; overlay: HTMLElement },
   ) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D context unavailable");
     this.ctx = ctx;
     this.scoreEl = hud.score;
     this.coinsEl = hud.coins;
+    this.charmsEl = hud.charms;
     this.multiplierEl = hud.multiplier;
     this.overlayEl = hud.overlay;
     this.progression = loadProgression(window.localStorage);
-    this.coinsEl.textContent = `🪙 ${this.progression.currency}`;
+    this.syncProgressionHud();
     this.unbindInput = bindInput((action) => this.handleAction(action));
+  }
+
+  private syncProgressionHud(): void {
+    this.coinsEl.textContent = `🪙 ${this.progression.currency}`;
+    this.charmsEl.textContent = `🛡×${this.progression.charms}`;
   }
 
   start(): void {
@@ -188,6 +210,7 @@ export class Game {
     this.popups = [];
     this.shake = createCameraShakeState();
     this.trailTimer = 0;
+    this.invulnerableUntil = -Infinity;
     this.overlayEl.innerHTML = "";
   }
 
@@ -242,6 +265,11 @@ export class Game {
       if (obstacle.resolved || obstacle.x > PLAYER_X) continue;
       obstacle.resolved = true;
 
+      // A Second Wind save grants a brief window where every hazard is
+      // passed through harmlessly — covers multi-obstacle patterns like a
+      // gauntlet, not just the single hit that triggered the save.
+      if (this.clock < this.invulnerableUntil) continue;
+
       const isFullWidth = obstacle.lane === FULL_WIDTH_LANE;
 
       // Full-width hazards span every lane — there's no dodging into safety,
@@ -262,11 +290,26 @@ export class Game {
         this.applyTrick("jump");
       } else if (needsSlide && this.player.aerial === "sliding") {
         this.applyTrick("slide");
+      } else if (hasCharm(this.progression)) {
+        this.useCharmSave();
       } else {
         this.endRun();
         return;
       }
     }
+  }
+
+  /** Spends a Second Wind charm to survive what would otherwise be a
+   * crash — a run modifier bought with currency rather than a trick, so it
+   * gets its own distinct (smaller, green) feedback instead of the crash
+   * shake and spark burst. */
+  private useCharmSave(): void {
+    this.progression = consumeCharm(this.progression);
+    saveProgression(window.localStorage, this.progression);
+    this.syncProgressionHud();
+    this.invulnerableUntil = this.clock + CHARM_SAVE_INVULNERABILITY;
+    this.shake = triggerShake(this.shake, CHARM_SAVE_SHAKE_TRAUMA);
+    this.particles.push(...spawnBurst(PLAYER_X, laneCenterY(this.player.lane), CHARM_SAVE_BURST_COLOR));
   }
 
   /** Lands a trick and punctuates it with a spark burst and a floating
@@ -295,19 +338,28 @@ export class Game {
     this.renderGameOverOverlay(finalScore, earned);
   }
 
+  /** One cosmetic's shop button: an unlock offer if not owned yet, or an
+   * equip/switch-back toggle once it is. */
+  private cosmeticShopButtonHtml(id: CosmeticId): string {
+    const meta = COSMETICS[id];
+    if (!isUnlocked(this.progression, id)) {
+      const afford = this.progression.currency >= meta.cost;
+      return `<button type="button" data-unlock="${id}" ${afford ? "" : "disabled"}>Unlock ${meta.name} (🪙${meta.cost})</button>`;
+    }
+    const equipped = this.progression.equipped === id;
+    return `<button type="button" data-equip="${id}">${equipped ? "Switch to Classic" : `Equip ${meta.name}`}</button>`;
+  }
+
   /** Renders the game-over panel: final score, the currency just earned,
-   * a restart button, and a tiny shop for the run's one cosmetic unlock —
-   * re-called after a shop action so the panel reflects the new balance
+   * a restart button, and a shop for cosmetic unlocks + Second Wind charms
+   * — re-called after a shop action so the panel reflects the new balance
    * without re-awarding currency. */
   private renderGameOverOverlay(finalScore: number, earned: number): void {
-    this.coinsEl.textContent = `🪙 ${this.progression.currency}`;
+    this.syncProgressionHud();
 
-    const cost = COSMETICS[SHOP_COSMETIC].cost;
-    const unlocked = isUnlocked(this.progression, SHOP_COSMETIC);
-    const equipped = this.progression.equipped === SHOP_COSMETIC;
-    const shopHtml = unlocked
-      ? `<button type="button" data-equip>${equipped ? "Switch to Classic" : "Equip Gold Trail"}</button>`
-      : `<button type="button" data-unlock ${this.progression.currency >= cost ? "" : "disabled"}>Unlock Gold Trail (🪙${cost})</button>`;
+    const charmCost = PROGRESSION_CONFIG.secondWindCost;
+    const canAffordCharm = this.progression.currency >= charmCost;
+    const cosmeticButtons = SHOP_COSMETICS.map((id) => this.cosmeticShopButtonHtml(id)).join("");
 
     this.overlayEl.innerHTML = `
       <div class="panel">
@@ -315,17 +367,35 @@ export class Game {
         <p>Score: ${finalScore}</p>
         <p class="currency-earned">+${earned} 🪙 (total ${this.progression.currency})</p>
         <button type="button" data-restart>Run again (Jump)</button>
-        ${shopHtml}
+        <p class="shop-label">Shop</p>
+        <div class="shop-row">
+          ${cosmeticButtons}
+          <button type="button" data-buy-charm ${canAffordCharm ? "" : "disabled"}>
+            Second Wind 🛡×${this.progression.charms} (🪙${charmCost})
+          </button>
+        </div>
       </div>`;
 
     this.overlayEl.querySelector<HTMLButtonElement>("[data-restart]")?.addEventListener("click", () => this.restart());
-    this.overlayEl.querySelector<HTMLButtonElement>("[data-unlock]")?.addEventListener("click", () => {
-      this.progression = unlockCosmetic(this.progression, SHOP_COSMETIC);
-      saveProgression(window.localStorage, this.progression);
-      this.renderGameOverOverlay(finalScore, earned);
+    this.overlayEl.querySelectorAll<HTMLButtonElement>("[data-unlock]").forEach((button) => {
+      const id = button.dataset.unlock as CosmeticId;
+      button.addEventListener("click", () => {
+        this.progression = unlockCosmetic(this.progression, id);
+        saveProgression(window.localStorage, this.progression);
+        this.renderGameOverOverlay(finalScore, earned);
+      });
     });
-    this.overlayEl.querySelector<HTMLButtonElement>("[data-equip]")?.addEventListener("click", () => {
-      this.progression = equipCosmetic(this.progression, equipped ? "default" : SHOP_COSMETIC);
+    this.overlayEl.querySelectorAll<HTMLButtonElement>("[data-equip]").forEach((button) => {
+      const id = button.dataset.equip as CosmeticId;
+      button.addEventListener("click", () => {
+        const target = this.progression.equipped === id ? "default" : id;
+        this.progression = equipCosmetic(this.progression, target);
+        saveProgression(window.localStorage, this.progression);
+        this.renderGameOverOverlay(finalScore, earned);
+      });
+    });
+    this.overlayEl.querySelector<HTMLButtonElement>("[data-buy-charm]")?.addEventListener("click", () => {
+      this.progression = buyCharm(this.progression);
       saveProgression(window.localStorage, this.progression);
       this.renderGameOverOverlay(finalScore, earned);
     });

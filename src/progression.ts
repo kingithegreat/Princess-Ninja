@@ -10,23 +10,33 @@ export const PROGRESSION_STORAGE_KEY = "princess-ninja:progression";
 export const COSMETICS = {
   default: { id: "default", name: "Classic", cost: 0, trailColor: "#7b61ff", capeColor: "#c1121f" },
   goldTrail: { id: "goldTrail", name: "Gold Trail", cost: 500, trailColor: "#ffd166", capeColor: "#c9902b" },
+  crimsonBlade: { id: "crimsonBlade", name: "Crimson Blade", cost: 200, trailColor: "#ef476f", capeColor: "#7a0d1f" },
+  phantomTeal: { id: "phantomTeal", name: "Phantom Teal", cost: 900, trailColor: "#118ab2", capeColor: "#0a5a73" },
 } as const;
 
 export type CosmeticId = keyof typeof COSMETICS;
 
+/** Cosmetics offered in the shop, in display order. Excludes `default`,
+ * which is the free fallback rather than something to purchase. */
+export const SHOP_COSMETICS: CosmeticId[] = ["goldTrail", "crimsonBlade", "phantomTeal"];
+
 export const PROGRESSION_CONFIG = {
   /** Currency earned per point of a run's final (distance + style) score. */
   currencyPerScorePoint: 0.05,
+  /** Cost of one Second Wind charm — a run modifier that survives a single
+   * crash instead of ending the run. */
+  secondWindCost: 150,
 } as const;
 
 export interface ProgressionState {
   currency: number;
   unlocked: CosmeticId[];
   equipped: CosmeticId;
+  charms: number;
 }
 
 export function createProgressionState(): ProgressionState {
-  return { currency: 0, unlocked: [], equipped: "default" };
+  return { currency: 0, unlocked: [], equipped: "default", charms: 0 };
 }
 
 /** Loads saved progression, falling back to a fresh state on missing or
@@ -43,6 +53,7 @@ export function loadProgression(store: KeyValueStore): ProgressionState {
         ? parsed.unlocked.filter((id: unknown): id is CosmeticId => typeof id === "string" && id in COSMETICS)
         : [],
       equipped: typeof parsed.equipped === "string" && parsed.equipped in COSMETICS ? parsed.equipped : "default",
+      charms: typeof parsed.charms === "number" && parsed.charms >= 0 ? parsed.charms : 0,
     };
   } catch {
     return createProgressionState();
@@ -84,4 +95,21 @@ export function equipCosmetic(state: ProgressionState, id: CosmeticId): Progress
 
 export function activeCosmetic(state: ProgressionState) {
   return COSMETICS[state.equipped];
+}
+
+/** Buys one Second Wind charm. A no-op if currency is insufficient. */
+export function buyCharm(state: ProgressionState): ProgressionState {
+  if (state.currency < PROGRESSION_CONFIG.secondWindCost) return state;
+  return { ...state, currency: state.currency - PROGRESSION_CONFIG.secondWindCost, charms: state.charms + 1 };
+}
+
+export function hasCharm(state: ProgressionState): boolean {
+  return state.charms > 0;
+}
+
+/** Spends one charm. A no-op if none are held — callers should check
+ * `hasCharm` first to decide whether the save even happens. */
+export function consumeCharm(state: ProgressionState): ProgressionState {
+  if (state.charms <= 0) return state;
+  return { ...state, charms: state.charms - 1 };
 }
