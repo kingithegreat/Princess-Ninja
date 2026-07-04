@@ -1,9 +1,13 @@
 import { bindInput } from "./input";
 import {
+  DIFFICULTY_TIERS,
+  FULL_WIDTH_LANE,
+  JUMP_TYPES,
   Obstacle,
+  SLIDE_TYPES,
   advanceObstacles,
   resetObstacleIds,
-  spawnObstacle,
+  spawnWave,
 } from "./obstacles";
 import {
   PlayerState,
@@ -36,6 +40,15 @@ const DODGE_RELEVANCE_WINDOW = 1.2;
 
 function laneCenterY(lane: number): number {
   return LANE_TOP + lane * LANE_HEIGHT + LANE_HEIGHT / 2;
+}
+
+/** Spawn waves come faster the further the run has gone, on top of the
+ * gameplay speed ramp — distance drives both raw speed and hazard density. */
+function spawnIntervalRange(distance: number): [number, number] {
+  if (distance >= DIFFICULTY_TIERS.gauntlet) return [0.55, 0.85];
+  if (distance >= DIFFICULTY_TIERS.fullWidth) return [0.65, 1.0];
+  if (distance >= DIFFICULTY_TIERS.twinLane) return [0.75, 1.15];
+  return [SPAWN_INTERVAL_MIN, SPAWN_INTERVAL_MAX];
 }
 
 export class Game {
@@ -127,9 +140,9 @@ export class Game {
 
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
-      this.obstacles.push(spawnObstacle(900));
-      this.spawnTimer =
-        SPAWN_INTERVAL_MIN + Math.random() * (SPAWN_INTERVAL_MAX - SPAWN_INTERVAL_MIN);
+      this.obstacles.push(...spawnWave(900, this.distance));
+      const [min, max] = spawnIntervalRange(this.distance);
+      this.spawnTimer = min + Math.random() * (max - min);
     }
     this.obstacles = advanceObstacles(this.obstacles, this.speed * dt);
     this.resolveCollisions();
@@ -143,7 +156,11 @@ export class Game {
       if (obstacle.resolved || obstacle.x > PLAYER_X) continue;
       obstacle.resolved = true;
 
-      if (obstacle.lane !== this.player.lane) {
+      const isFullWidth = obstacle.lane === FULL_WIDTH_LANE;
+
+      // Full-width hazards span every lane — there's no dodging into safety,
+      // the matching trick is the only way through.
+      if (!isFullWidth && obstacle.lane !== this.player.lane) {
         const elapsed = this.clock - this.player.lastLaneChangeAt;
         if (elapsed <= DODGE_RELEVANCE_WINDOW) {
           const tightness = Math.max(0, 1 - elapsed / DODGE_RELEVANCE_WINDOW);
@@ -152,9 +169,12 @@ export class Game {
         continue;
       }
 
-      if (obstacle.type === "hurdle" && this.player.aerial === "jumping") {
+      const needsJump = JUMP_TYPES.includes(obstacle.type);
+      const needsSlide = SLIDE_TYPES.includes(obstacle.type);
+
+      if (needsJump && this.player.aerial === "jumping") {
         this.style = landTrick(this.style, "jump");
-      } else if (obstacle.type === "barrier" && this.player.aerial === "sliding") {
+      } else if (needsSlide && this.player.aerial === "sliding") {
         this.style = landTrick(this.style, "slide");
       } else {
         this.endRun();
@@ -182,6 +202,21 @@ export class Game {
     }
 
     for (const obstacle of this.obstacles) {
+      if (obstacle.lane === FULL_WIDTH_LANE) {
+        const trackTop = LANE_TOP;
+        const trackHeight = LANE_HEIGHT * 3;
+        if (obstacle.type === "spikes") {
+          // Ground-level spike strip across the whole track — jump it.
+          ctx.fillStyle = "#c1121f";
+          ctx.fillRect(obstacle.x - 16, trackTop, 32, trackHeight);
+        } else {
+          // Overhead beam leaving headroom at the bottom — slide under it.
+          ctx.fillStyle = "#7b61ff";
+          ctx.fillRect(obstacle.x - 16, trackTop, 32, trackHeight - 34);
+        }
+        continue;
+      }
+
       ctx.fillStyle =
         obstacle.type === "wall" ? "#ef476f" : obstacle.type === "hurdle" ? "#ffd166" : "#118ab2";
       const y = laneCenterY(obstacle.lane);
