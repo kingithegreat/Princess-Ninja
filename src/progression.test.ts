@@ -45,6 +45,11 @@ describe("progression state", () => {
     expect(currencyForRun(0)).toBe(0);
   });
 
+  it("applies a currency multiplier (Gold Rush) when given one", () => {
+    expect(currencyForRun(1000, PERKS.goldRush.currencyMultiplier)).toBe(62);
+    expect(currencyForRun(1000, 1)).toBe(50);
+  });
+
   it("awards currency additively", () => {
     let state = createProgressionState();
     state = awardCurrency(state, 50);
@@ -135,7 +140,7 @@ describe("charms (Second Wind)", () => {
   });
 });
 
-describe("perks (Head Start / Forgiving Combo)", () => {
+describe("perks (Head Start / Forgiving Combo / Steady Pace / Gold Rush)", () => {
   it("reports no perk owned by default", () => {
     expect(hasPerk(createProgressionState(), "headStart")).toBe(false);
   });
@@ -168,6 +173,15 @@ describe("perks (Head Start / Forgiving Combo)", () => {
     state = buyPerk(state, "comboWindow");
     expect(hasPerk(state, "headStart")).toBe(true);
     expect(hasPerk(state, "comboWindow")).toBe(true);
+  });
+
+  it("sells Steady Pace and Gold Rush like any other perk", () => {
+    let state = awardCurrency(createProgressionState(), 2000);
+    state = buyPerk(state, "steadyPace");
+    state = buyPerk(state, "goldRush");
+    expect(hasPerk(state, "steadyPace")).toBe(true);
+    expect(hasPerk(state, "goldRush")).toBe(true);
+    expect(state.currency).toBe(2000 - PERKS.steadyPace.cost - PERKS.goldRush.cost);
   });
 });
 

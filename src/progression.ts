@@ -49,12 +49,28 @@ export const PERKS = {
      * more breathing room before the multiplier starts decaying. */
     bonusSeconds: 1,
   },
+  steadyPace: {
+    id: "steadyPace",
+    name: "Steady Pace",
+    cost: 450,
+    /** Multiplies the run's per-second speed ramp — below 1 slows how
+     * quickly a run accelerates toward max speed, buying more time at a
+     * manageable pace before things get frantic. */
+    speedRampMultiplier: 0.65,
+  },
+  goldRush: {
+    id: "goldRush",
+    name: "Gold Rush",
+    cost: 600,
+    /** Multiplies the currency earned at the end of every run. */
+    currencyMultiplier: 1.25,
+  },
 } as const;
 
 export type PerkId = keyof typeof PERKS;
 
 /** Perks offered in the shop, in display order. */
-export const SHOP_PERKS: PerkId[] = ["headStart", "comboWindow"];
+export const SHOP_PERKS: PerkId[] = ["headStart", "comboWindow", "steadyPace", "goldRush"];
 
 export interface ProgressionState {
   currency: number;
@@ -96,9 +112,11 @@ export function saveProgression(store: KeyValueStore, state: ProgressionState): 
   store.setItem(PROGRESSION_STORAGE_KEY, JSON.stringify(state));
 }
 
-/** Currency earned from a finished run's total score. */
-export function currencyForRun(totalScore: number): number {
-  return Math.floor(totalScore * PROGRESSION_CONFIG.currencyPerScorePoint);
+/** Currency earned from a finished run's total score. `multiplier` applies
+ * the Gold Rush perk's bonus, if owned — callers pass 1 (the default) when
+ * it isn't. */
+export function currencyForRun(totalScore: number, multiplier = 1): number {
+  return Math.floor(totalScore * PROGRESSION_CONFIG.currencyPerScorePoint * multiplier);
 }
 
 export function awardCurrency(state: ProgressionState, amount: number): ProgressionState {
