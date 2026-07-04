@@ -114,7 +114,7 @@ export class Game {
   private speed = BASE_SPEED;
   private clock = 0;
   private spawnTimer = 1;
-  private gameOver = false;
+  private phase: "start" | "playing" | "gameOver" = "start";
   private lastFrameTime = 0;
   private unbindInput: () => void;
 
@@ -146,6 +146,7 @@ export class Game {
     this.progression = loadProgression(window.localStorage);
     this.syncProgressionHud();
     this.unbindInput = bindInput((action) => this.handleAction(action));
+    this.renderStartOverlay();
   }
 
   private syncProgressionHud(): void {
@@ -163,8 +164,8 @@ export class Game {
   }
 
   private handleAction(action: "left" | "right" | "jump" | "slide"): void {
-    if (this.gameOver) {
-      if (action === "jump") this.restart();
+    if (this.phase !== "playing") {
+      if (action === "jump") this.beginRun();
       return;
     }
     switch (action) {
@@ -196,7 +197,9 @@ export class Game {
     this.particles.push(...spawnDust(PLAYER_X - 10, y));
   }
 
-  private restart(): void {
+  /** Resets run-scoped state and starts playing — used both for the very
+   * first run (from the start screen) and every restart after a crash. */
+  private beginRun(): void {
     this.player = createPlayerState();
     this.obstacles = [];
     this.style = createStyleScoreState();
@@ -204,7 +207,7 @@ export class Game {
     this.speed = BASE_SPEED;
     this.clock = 0;
     this.spawnTimer = 1;
-    this.gameOver = false;
+    this.phase = "playing";
     resetObstacleIds();
     this.particles = [];
     this.popups = [];
@@ -217,7 +220,7 @@ export class Game {
   private loop(time: number): void {
     const dt = Math.min(0.05, (time - this.lastFrameTime) / 1000);
     this.lastFrameTime = time;
-    if (!this.gameOver) {
+    if (this.phase === "playing") {
       this.update(dt);
     }
     this.render();
@@ -326,7 +329,7 @@ export class Game {
   }
 
   private endRun(): void {
-    this.gameOver = true;
+    this.phase = "gameOver";
     this.style = crashStyleScore(this.style);
     this.shake = triggerShake(this.shake, CRASH_SHAKE_TRAUMA);
 
@@ -350,39 +353,32 @@ export class Game {
     return `<button type="button" data-equip="${id}">${equipped ? "Switch to Classic" : `Equip ${meta.name}`}</button>`;
   }
 
-  /** Renders the game-over panel: final score, the currency just earned,
-   * a restart button, and a shop for cosmetic unlocks + Second Wind charms
-   * — re-called after a shop action so the panel reflects the new balance
-   * without re-awarding currency. */
-  private renderGameOverOverlay(finalScore: number, earned: number): void {
-    this.syncProgressionHud();
-
+  /** Shop markup shared by the start screen and the game-over panel: every
+   * cosmetic's unlock/equip button plus the Second Wind charm purchase. */
+  private renderShopHtml(): string {
     const charmCost = PROGRESSION_CONFIG.secondWindCost;
     const canAffordCharm = this.progression.currency >= charmCost;
     const cosmeticButtons = SHOP_COSMETICS.map((id) => this.cosmeticShopButtonHtml(id)).join("");
-
-    this.overlayEl.innerHTML = `
-      <div class="panel">
-        <h2>Wiped out!</h2>
-        <p>Score: ${finalScore}</p>
-        <p class="currency-earned">+${earned} 🪙 (total ${this.progression.currency})</p>
-        <button type="button" data-restart>Run again (Jump)</button>
-        <p class="shop-label">Shop</p>
-        <div class="shop-row">
-          ${cosmeticButtons}
-          <button type="button" data-buy-charm ${canAffordCharm ? "" : "disabled"}>
-            Second Wind 🛡×${this.progression.charms} (🪙${charmCost})
-          </button>
-        </div>
+    return `
+      <p class="shop-label">Shop</p>
+      <div class="shop-row">
+        ${cosmeticButtons}
+        <button type="button" data-buy-charm ${canAffordCharm ? "" : "disabled"}>
+          Second Wind 🛡×${this.progression.charms} (🪙${charmCost})
+        </button>
       </div>`;
+  }
 
-    this.overlayEl.querySelector<HTMLButtonElement>("[data-restart]")?.addEventListener("click", () => this.restart());
+  /** Wires up every shop button currently in the overlay. `rerender` is
+   * called after each purchase/unlock/equip so the panel reflects the new
+   * balance in place — used by both the start screen and game-over panel. */
+  private attachShopListeners(rerender: () => void): void {
     this.overlayEl.querySelectorAll<HTMLButtonElement>("[data-unlock]").forEach((button) => {
       const id = button.dataset.unlock as CosmeticId;
       button.addEventListener("click", () => {
         this.progression = unlockCosmetic(this.progression, id);
         saveProgression(window.localStorage, this.progression);
-        this.renderGameOverOverlay(finalScore, earned);
+        rerender();
       });
     });
     this.overlayEl.querySelectorAll<HTMLButtonElement>("[data-equip]").forEach((button) => {
@@ -391,14 +387,47 @@ export class Game {
         const target = this.progression.equipped === id ? "default" : id;
         this.progression = equipCosmetic(this.progression, target);
         saveProgression(window.localStorage, this.progression);
-        this.renderGameOverOverlay(finalScore, earned);
+        rerender();
       });
     });
     this.overlayEl.querySelector<HTMLButtonElement>("[data-buy-charm]")?.addEventListener("click", () => {
       this.progression = buyCharm(this.progression);
       saveProgression(window.localStorage, this.progression);
-      this.renderGameOverOverlay(finalScore, earned);
+      rerender();
     });
+  }
+
+  /** Renders the pre-run start screen: title, a start button, and the same
+   * shop as the game-over panel — spend currency banked from earlier runs
+   * before committing to the next one. */
+  private renderStartOverlay(): void {
+    this.syncProgressionHud();
+    this.overlayEl.innerHTML = `
+      <div class="panel">
+        <h2>Princess Ninja</h2>
+        <p>Dodge, jump, and slide with style — safe runs score low, risky tricks score high.</p>
+        <button type="button" data-start>Start Run (Jump)</button>
+        ${this.renderShopHtml()}
+      </div>`;
+    this.overlayEl.querySelector<HTMLButtonElement>("[data-start]")?.addEventListener("click", () => this.beginRun());
+    this.attachShopListeners(() => this.renderStartOverlay());
+  }
+
+  /** Renders the game-over panel: final score, the currency just earned,
+   * a restart button, and the shop — re-called after a shop action so the
+   * panel reflects the new balance without re-awarding currency. */
+  private renderGameOverOverlay(finalScore: number, earned: number): void {
+    this.syncProgressionHud();
+    this.overlayEl.innerHTML = `
+      <div class="panel">
+        <h2>Wiped out!</h2>
+        <p>Score: ${finalScore}</p>
+        <p class="currency-earned">+${earned} 🪙 (total ${this.progression.currency})</p>
+        <button type="button" data-restart>Run again (Jump)</button>
+        ${this.renderShopHtml()}
+      </div>`;
+    this.overlayEl.querySelector<HTMLButtonElement>("[data-restart]")?.addEventListener("click", () => this.beginRun());
+    this.attachShopListeners(() => this.renderGameOverOverlay(finalScore, earned));
   }
 
   private render(): void {

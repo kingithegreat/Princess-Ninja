@@ -48,17 +48,20 @@ dashes, and procedural player animation (run bob, jump arc, cape/head
 silhouette). All still programmatic canvas art — no sprite/image assets yet.
 
 Milestone 4 (meta progression) is broadened out: a run's final score
-converts to currency, persisted to `localStorage`; the game-over shop sells
-three cosmetic unlocks (Gold Trail, Crimson Blade, Phantom Teal — each an
+converts to currency, persisted to `localStorage`; the shop sells three
+cosmetic unlocks (Gold Trail, Crimson Blade, Phantom Teal — each an
 equippable trail/cape recolor) and a stackable "Second Wind" charm — a run
 modifier that silently absorbs one otherwise-fatal hit (brief harmless-pass-
 through window, distinct green save-burst + smaller shake) instead of
-ending the run. HUD shows coins and charms live; game-over panel re-renders
-after each shop action without re-awarding currency.
+ending the run. HUD shows coins and charms live. The shop itself is no
+longer game-over-only: a pre-run start screen (shown on load, and reused
+after every crash's "Run again") lets you spend banked currency before
+committing to the next run, sharing the same shop markup/listener wiring
+as the game-over panel.
 
 ## Next step
 - Milestone 3 still needs real sprite/character art (an asset pipeline or
   drawn character sheet) to replace the placeholder rectangle — a design
   asset task rather than a code task.
-- Milestone 4 could still grow a proper standalone shop screen (buy between
-  runs, not just at game-over) and more run modifiers beyond Second Wind.
+- Milestone 4 could still grow more run modifiers beyond Second Wind (e.g.
+  a currency-bought head start, a forgiving-combo-window perk).
