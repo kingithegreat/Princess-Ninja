@@ -2,6 +2,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -11,17 +16,29 @@ body {
   background: #10121c;
   color: #f4f0ff;
   font-family: system-ui, sans-serif;
+  touch-action: none;
 }
 
+/* The canvas' internal drawing resolution is a fixed 800x450 (16:9) — only
+ * its on-screen CSS size scales here, so game coordinates stay untouched.
+ * container-type lets the HUD scale its font off #app's own size instead of
+ * the viewport, so it stays legible whichever dimension is the constraint
+ * (width on a tablet, height on a portrait phone). */
 #app {
   position: relative;
+  width: min(94vw, calc(94vh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  container-type: inline-size;
 }
 
 canvas {
   display: block;
+  width: 100%;
+  height: 100%;
   background: #1c1f30;
   border-radius: 8px;
   box-shadow: 0 0 0 2px #3a3f5c;
+  touch-action: none;
 }
 
 #hud {
@@ -31,7 +48,7 @@ canvas {
   right: 16px;
   display: flex;
   justify-content: space-between;
-  font-size: 1.25rem;
+  font-size: clamp(0.7rem, 3.4cqw, 1.25rem);
   font-weight: 600;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   pointer-events: none;
@@ -64,8 +81,21 @@ canvas {
   background: rgba(16, 18, 28, 0.85);
   border: 1px solid #3a3f5c;
   border-radius: 12px;
-  padding: 24px 32px;
+  padding: clamp(12px, 4cqw, 24px) clamp(16px, 5cqw, 32px);
+  max-width: 92%;
+  max-height: 92%;
+  overflow-y: auto;
   pointer-events: auto;
+}
+
+#overlay .panel h2 {
+  font-size: clamp(1rem, 5cqw, 1.5rem);
+  margin: 0 0 8px;
+}
+
+#overlay .panel p {
+  font-size: clamp(0.7rem, 3cqw, 1rem);
+  margin: 6px 0;
 }
 
 #overlay .currency-earned {
@@ -75,7 +105,7 @@ canvas {
 
 #overlay .shop-label {
   margin: 14px 0 6px;
-  font-size: 0.75rem;
+  font-size: clamp(0.6rem, 2.6cqw, 0.75rem);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   opacity: 0.65;
@@ -86,14 +116,14 @@ canvas {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  max-width: 320px;
+  max-width: min(320px, 90cqw);
 }
 
 #overlay button {
   display: block;
   margin: 12px auto 0;
-  padding: 8px 20px;
-  font-size: 1rem;
+  padding: clamp(6px, 2cqw, 8px) clamp(14px, 4cqw, 20px);
+  font-size: clamp(0.8rem, 3cqw, 1rem);
   border-radius: 6px;
   border: none;
   background: #ffd166;
@@ -102,8 +132,8 @@ canvas {
 
 #overlay .shop-row button {
   margin: 0;
-  padding: 6px 12px;
-  font-size: 0.85rem;
+  padding: clamp(4px, 1.4cqw, 6px) clamp(8px, 2.6cqw, 12px);
+  font-size: clamp(0.65rem, 2.4cqw, 0.85rem);
 }
 
 #overlay button:disabled {

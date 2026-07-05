@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "cap:sync": "npm run build && cap sync android",
-    "android:build": "npm run cap:sync && cd android && ./gradlew assembleDebug"
+    "android:build": "npm run cap:sync && cd android && ./gradlew assembleDebug",
+    "android:build:release": "npm run cap:sync && cd android && ./gradlew assembleRelease"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",
