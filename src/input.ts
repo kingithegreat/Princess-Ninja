@@ -21,7 +21,7 @@ const KEY_MAP: Record<string, Action> = {
  * than a swipe — tap defaults to jump, the runner-genre norm. */
 const SWIPE_THRESHOLD = 24;
 
-function swipeToAction(dx: number, dy: number): Action {
+export function swipeToAction(dx: number, dy: number): Action {
   if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return "jump";
   if (Math.abs(dy) > Math.abs(dx)) return dy < 0 ? "jump" : "slide";
   return dx < 0 ? "left" : "right";
