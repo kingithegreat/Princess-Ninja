@@ -131,11 +131,30 @@ production keystore is an ops/secrets step for the repo owner, not
 something a dev session can do — `npm run android:build:release` is there
 for a local signed build once `keystore.properties` exists.
 
+Capacitor's placeholder app icon and splash screen are replaced with real
+ones, procedurally: `assets/icon-source.html`/`icon-foreground.html` draw the
+same cape/body/head shapes and palette as the in-game player render
+(`src/game.ts`'s `renderPlayer`), rendered to PNG with a headless browser
+screenshot rather than `@capacitor/assets`, since that tool needs `sharp`,
+whose prebuilt binary download this sandbox's network policy blocks (`npm
+install` failed with a 403 on `sharp-libvips`'s GitHub release). Instead,
+`assets/generate-icons.py` (Pillow) resizes/composites the two source PNGs
+into every density-specific `mipmap`/`drawable` file Android expects,
+matching the existing placeholders' exact dimensions so no manifest/XML
+wiring changed — plus a themed `ic_launcher_background` color (`#1c1f30`,
+the game's own canvas background) replacing the default white/teal. Two
+unreferenced default-template leftovers (`drawable/ic_launcher_background.xml`,
+`drawable-v24/ic_launcher_foreground.xml` — confirmed unused via a repo-wide
+grep) were removed rather than left stale. Verified visually via the
+generated PNGs at each size (icon, round icon, portrait/landscape splash);
+gradle itself still isn't runnable from this sandbox (see Milestone 5 build
+notes above), so the actual APK render is CI's `android.yml` job to confirm.
+
 ## Next step
-- Milestone 5 still needs: an app icon/splash screen (currently Capacitor's
-  generic placeholders) and the repo owner generating a real release
-  keystore + populating the `ANDROID_KEYSTORE_BASE64`/etc. GitHub secrets
-  so `build-release-apk` actually runs.
+- Milestone 5 still needs: the repo owner generating a real release keystore
+  + populating the `ANDROID_KEYSTORE_BASE64`/etc. GitHub secrets so
+  `build-release-apk` actually runs, and a real device/emulator check of the
+  new icon and splash screen (only verified as static PNGs so far).
 - Milestone 3 still needs real sprite/character art (an asset pipeline or
-  drawn character sheet) to replace the placeholder rectangle — a design
-  asset task rather than a code task.
+  drawn character sheet) to replace the placeholder rectangle in the game's
+  own canvas rendering — a design asset task rather than a code task.

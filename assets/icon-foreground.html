@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html, body { margin: 0; padding: 0; background: transparent; }
+      canvas { display: block; background: transparent; }
+    </style>
+  </head>
+  <body>
+    <canvas id="icon" width="1024" height="1024"></canvas>
+    <script>
+      const ctx = document.getElementById("icon").getContext("2d");
+
+      // Character only (no glow) sized to Android's adaptive-icon safe
+      // zone — the guaranteed-visible inner ~66% circle of the 108dp
+      // foreground layer — so it isn't clipped by circular/squircle masks.
+      const capeColor = "#c1121f";
+      const bodyColor = "#f4f0ff";
+      const headColor = "#ffd166";
+
+      const width = 320;
+      const height = 597;
+      const capeLength = 203;
+      const CX = 512 + capeLength / 2;
+      const CY = 512;
+      const bodyTop = CY - height / 2;
+
+      ctx.fillStyle = capeColor;
+      ctx.beginPath();
+      ctx.moveTo(CX - width / 2, bodyTop + 40);
+      ctx.lineTo(CX - width / 2 - capeLength, bodyTop + height / 2 + 20);
+      ctx.lineTo(CX - width / 2, bodyTop + height - 40);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = bodyColor;
+      const r = 26;
+      const x = CX - width / 2;
+      const y = bodyTop;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + width, y, x + width, y + height, r);
+      ctx.arcTo(x + width, y + height, x, y + height, r);
+      ctx.arcTo(x, y + height, x, y, r);
+      ctx.arcTo(x, y, x + width, y, r);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = headColor;
+      ctx.beginPath();
+      ctx.arc(CX, bodyTop + 70, 66, 0, Math.PI * 2);
+      ctx.fill();
+    </script>
+  </body>
+</html>
