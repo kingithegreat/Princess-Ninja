@@ -11,6 +11,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  check-signing-secret:
+    runs-on: ubuntu-latest
+    outputs:
+      has_keystore: ${{ steps.check.outputs.has_keystore }}
+    steps:
+      - id: check
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "has_keystore=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_keystore=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-debug-apk:
     runs-on: ubuntu-latest
     steps:
@@ -38,8 +53,17 @@ jobs:
     # repo secrets (see android/keystore.properties.example for what to
     # generate and where these secret names come from). Skips cleanly
     # otherwise so this workflow doesn't fail before that setup is done.
+    #
+    # NOTE: `if:` conditions cannot reference `secrets` directly — GitHub
+    # Actions rejects that at workflow-parse time with a startup_failure
+    # (zero jobs run, no logs, instant "failure" on every single push).
+    # That's exactly what was happening here since this job was added.
+    # The guard job below evaluates the secret in a normal step (where
+    # secrets ARE allowed) and exposes a plain string output instead,
+    # which `if:` is allowed to read.
+    needs: check-signing-secret
+    if: needs.check-signing-secret.outputs.has_keystore == 'true'
     runs-on: ubuntu-latest
-    if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
