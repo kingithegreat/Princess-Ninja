@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html, body { margin: 0; padding: 0; background: transparent; }
+      canvas { display: block; background: transparent; }
+    </style>
+  </head>
+  <body>
+    <canvas id="icon" width="1024" height="1024"></canvas>
+    <script>
+      const ctx = document.getElementById("icon").getContext("2d");
+      const CX = 607;
+      const CY = 512;
+
+      // Same palette as the in-game player render (src/game.ts renderPlayer):
+      // default cape #c1121f, body #f4f0ff, head accent #ffd166, plus the
+      // multiplier "heat" glow aura so the icon reads as the Style Score hook.
+      const capeColor = "#c1121f";
+      const bodyColor = "#f4f0ff";
+      const headColor = "#ffd166";
+
+      const width = 300;
+      const height = 560;
+      const bodyTop = CY - height / 2;
+
+      // Glow aura
+      const glow = ctx.createRadialGradient(CX, CY, 40, CX, CY, 420);
+      glow.addColorStop(0, "rgba(255, 209, 102, 0.55)");
+      glow.addColorStop(1, "rgba(255, 209, 102, 0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(CX, CY, 420, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Cape trailing behind/left, same triangular silhouette as in-game
+      const capeLength = 190;
+      ctx.fillStyle = capeColor;
+      ctx.beginPath();
+      ctx.moveTo(CX - width / 2, bodyTop + 40);
+      ctx.lineTo(CX - width / 2 - capeLength, bodyTop + height / 2 + 20);
+      ctx.lineTo(CX - width / 2, bodyTop + height - 40);
+      ctx.closePath();
+      ctx.fill();
+
+      // Body
+      ctx.fillStyle = bodyColor;
+      const r = 26;
+      const x = CX - width / 2;
+      const y = bodyTop;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + width, y, x + width, y + height, r);
+      ctx.arcTo(x + width, y + height, x, y + height, r);
+      ctx.arcTo(x, y + height, x, y, r);
+      ctx.arcTo(x, y, x + width, y, r);
+      ctx.closePath();
+      ctx.fill();
+
+      // Head accent
+      ctx.fillStyle = headColor;
+      ctx.beginPath();
+      ctx.arc(CX, bodyTop + 70, 66, 0, Math.PI * 2);
+      ctx.fill();
+    </script>
+  </body>
+</html>
