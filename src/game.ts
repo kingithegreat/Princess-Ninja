@@ -1,4 +1,4 @@
-import { bindInput } from "./input";
+import { bindInput, bindPointerInput } from "./input";
 import {
   CameraShakeState,
   EFFECTS_CONFIG,
@@ -150,7 +150,12 @@ export class Game {
     this.overlayEl = hud.overlay;
     this.progression = loadProgression(window.localStorage);
     this.syncProgressionHud();
-    this.unbindInput = bindInput((action) => this.handleAction(action));
+    const unbindKeyboard = bindInput((action) => this.handleAction(action));
+    const unbindPointer = bindPointerInput(canvas, (action) => this.handleAction(action));
+    this.unbindInput = () => {
+      unbindKeyboard();
+      unbindPointer();
+    };
     this.renderStartOverlay();
   }
 

@@ -32,3 +32,44 @@ jobs:
         with:
           name: princess-ninja-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+  build-release-apk:
+    # Signed release build — only runs once a keystore is provisioned via
+    # repo secrets (see android/keystore.properties.example for what to
+    # generate and where these secret names come from). Skips cleanly
+    # otherwise so this workflow doesn't fail before that setup is done.
+    runs-on: ubuntu-latest
+    if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - name: Write keystore and signing config from secrets
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > princess-ninja-release.jks
+          cat > keystore.properties <<EOF
+          storeFile=princess-ninja-release.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: princess-ninja-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk

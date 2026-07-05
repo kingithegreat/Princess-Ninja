@@ -98,11 +98,44 @@ Verified for real via a manual `workflow_dispatch` run on `main` after
 merge: `gradlew assembleDebug` succeeded on GitHub's hosted runner and
 uploaded a working `princess-ninja-debug-apk` artifact (~3.6MB).
 
+Milestone 5 also picked up its remaining code-shaped items. The fixed
+800x450 canvas now scales responsively: `#app` sizes itself to
+`min(94vw, 94vh * 16/9)` with `aspect-ratio: 16/9`, so the canvas fills the
+available space in both portrait and landscape without changing the game's
+internal drawing coordinates; the HUD and shop panel use `cqw`-based
+`clamp()` font sizing (via `container-type: inline-size` on `#app`) so text
+stays legible instead of overflowing a small container, and the shop panel
+scrolls (`max-height: 92%; overflow-y: auto`) now that eight items don't fit
+a phone-sized screen at once. Verified via Playwright screenshots at a
+390x844 portrait viewport and 844x390 landscape.
+
+Since none of that mattered without a way to actually play on a touchscreen
+— the whole input layer was keyboard-only — `input.ts` gained
+`bindPointerInput`: swipe up/down maps to jump/slide, left/right to lane
+changes, and a stationary tap defaults to jump (the runner-genre norm),
+built on pointer events so it also works with a mouse on desktop. Verified
+by dispatching a synthetic swipe gesture in the Playwright check and
+confirming the run kept progressing (jump triggered, no crash).
+
+Release signing infrastructure is in place: `android/app/build.gradle` reads
+an untracked `android/keystore.properties` (template at
+`keystore.properties.example`, `.gitignore`d alongside `*.jks`) and applies
+it to the `release` signing config only when present, so unsigned
+debug/CI builds are unaffected. `.github/workflows/android.yml` gained a
+`build-release-apk` job that writes the keystore + properties from repo
+secrets (`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) and runs `assembleRelease`,
+gated on `ANDROID_KEYSTORE_BASE64` being set so the workflow doesn't fail
+before those secrets exist. Actually generating and provisioning a
+production keystore is an ops/secrets step for the repo owner, not
+something a dev session can do — `npm run android:build:release` is there
+for a local signed build once `keystore.properties` exists.
+
 ## Next step
 - Milestone 5 still needs: an app icon/splash screen (currently Capacitor's
-  generic placeholders), a release (signed) build + keystore management
-  instead of just the debug APK, and a check that the fixed 800x450 canvas
-  scales sensibly on real device screens.
+  generic placeholders) and the repo owner generating a real release
+  keystore + populating the `ANDROID_KEYSTORE_BASE64`/etc. GitHub secrets
+  so `build-release-apk` actually runs.
 - Milestone 3 still needs real sprite/character art (an asset pipeline or
   drawn character sheet) to replace the placeholder rectangle — a design
   asset task rather than a code task.
