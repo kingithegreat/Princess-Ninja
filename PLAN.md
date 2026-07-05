@@ -193,6 +193,13 @@ more cosmetic work:
 Added regression tests for the two progression.ts fixes (negative currency
 on load, `saveProgression` swallowing a throwing store).
 
+`input.ts`'s swipe/tap direction logic (added for the touch-controls pass)
+had no test coverage — every other module with real branching logic
+(styleScore, obstacles, progression, effects) has a `*.test.ts`, this was
+the one gap. Exported `swipeToAction` and added `input.test.ts` covering the
+tap-vs-swipe threshold boundary, vertical/horizontal mapping, diagonal
+dominant-axis selection, and the exact-tie case (breaks toward horizontal).
+
 ## Next step
 - Milestone 5 still needs: the repo owner generating a real release keystore
   + populating the `ANDROID_KEYSTORE_BASE64`/etc. GitHub secrets so
