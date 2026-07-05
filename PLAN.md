@@ -150,11 +150,21 @@ generated PNGs at each size (icon, round icon, portrait/landscape splash);
 gradle itself still isn't runnable from this sandbox (see Milestone 5 build
 notes above), so the actual APK render is CI's `android.yml` job to confirm.
 
+Milestone 3's in-game placeholder rectangle also got a code-only pass, using
+the same idea as the app icon: the player's body is now a rounded rect
+(matching the icon's softer silhouette) instead of a flat-cornered slab, with
+a contrasting hem stripe clipped to the bottom of that shape so the tunic
+reads as a dress rather than a plain block, and the head circle gained a
+dark mask band across its lower half — the "ninja" half of "ninja princess",
+leaving the gold hair visible above. All still procedural canvas drawing, no
+image assets. Verified visually via Playwright screenshots of the running,
+jumping, and sliding poses.
+
 ## Next step
 - Milestone 5 still needs: the repo owner generating a real release keystore
   + populating the `ANDROID_KEYSTORE_BASE64`/etc. GitHub secrets so
   `build-release-apk` actually runs, and a real device/emulator check of the
   new icon and splash screen (only verified as static PNGs so far).
 - Milestone 3 still needs real sprite/character art (an asset pipeline or
-  drawn character sheet) to replace the placeholder rectangle in the game's
-  own canvas rendering — a design asset task rather than a code task.
+  drawn character sheet) — actual illustrated frames, not more procedural
+  shape-drawing — a design asset task rather than a code task.

@@ -95,6 +95,25 @@ function laneCenterY(lane: number): number {
   return LANE_TOP + lane * LANE_HEIGHT + LANE_HEIGHT / 2;
 }
 
+/** Traces a rounded-rectangle path without filling/stroking it, so callers
+ * can fill, clip, or stroke as needed. */
+function roundedRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + width, y, x + width, y + height, radius);
+  ctx.arcTo(x + width, y + height, x, y + height, radius);
+  ctx.arcTo(x, y + height, x, y, radius);
+  ctx.arcTo(x, y, x + width, y, radius);
+  ctx.closePath();
+}
+
 /** Spawn waves come faster the further the run has gone, on top of the
  * gameplay speed ramp — distance drives both raw speed and hazard density. */
 function spawnIntervalRange(distance: number): [number, number] {
@@ -625,13 +644,34 @@ export class Game {
     ctx.closePath();
     ctx.fill();
 
+    // Rounded tunic body reads softer than a flat slab, matching the app
+    // icon's silhouette.
+    const bodyRadius = Math.min(10, width / 4, height / 4);
     ctx.fillStyle = "#f4f0ff";
-    ctx.fillRect(PLAYER_X - width / 2, top, width, height);
+    roundedRectPath(ctx, PLAYER_X - width / 2, top, width, height, bodyRadius);
+    ctx.fill();
+
+    // Hem band near the bottom of the tunic — a contrasting stripe so the
+    // silhouette reads as a dress rather than a plain rectangle.
+    const hemHeight = Math.min(10, height * 0.18);
+    ctx.fillStyle = activeCosmetic(this.progression).capeColor;
+    ctx.save();
+    roundedRectPath(ctx, PLAYER_X - width / 2, top, width, height, bodyRadius);
+    ctx.clip();
+    ctx.fillRect(PLAYER_X - width / 2, top + height - hemHeight, width, hemHeight);
+    ctx.restore();
 
     // Head accent so the sprite reads top-to-bottom instead of as a slab.
     ctx.fillStyle = "#ffd166";
     ctx.beginPath();
     ctx.arc(PLAYER_X, top + 10, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ninja mask band across the lower half of the head, leaving the gold
+    // "hair" visible above — sells the ninja half of "ninja princess".
+    ctx.fillStyle = "#2a1f3a";
+    ctx.beginPath();
+    ctx.arc(PLAYER_X, top + 10, 9, 0.15 * Math.PI, 0.85 * Math.PI);
     ctx.fill();
   }
 
