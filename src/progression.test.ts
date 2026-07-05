@@ -235,4 +235,21 @@ describe("persistence", () => {
     });
     expect(loadProgression(store).charms).toBe(0);
   });
+
+  it("falls back to zero currency on a negative or tampered currency value", () => {
+    const store = fakeStore({
+      [PROGRESSION_STORAGE_KEY]: JSON.stringify({ currency: -500, unlocked: [], equipped: "default", charms: 0 }),
+    });
+    expect(loadProgression(store).currency).toBe(0);
+  });
+
+  it("does not throw when the underlying store's setItem throws (quota exceeded, restricted WebView storage)", () => {
+    const store: KeyValueStore = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("quota exceeded");
+      },
+    };
+    expect(() => saveProgression(store, createProgressionState())).not.toThrow();
+  });
 });

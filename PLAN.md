@@ -160,6 +160,39 @@ leaving the gold hair visible above. All still procedural canvas drawing, no
 image assets. Verified visually via Playwright screenshots of the running,
 jumping, and sliding poses.
 
+A full-codebase bug audit (game.ts, player.ts, obstacles.ts, styleScore.ts,
+progression.ts, effects.ts) turned up and fixed five real issues rather than
+more cosmetic work:
+- **Camera shake never decayed after a crash.** `tickShake` only ran inside
+  `update()`, which stops once `phase` leaves `"playing"` — so the whole
+  game-over screen jittered the entire scene randomly, forever, since
+  trauma was frozen at its post-crash value instead of decaying to 0. Fixed
+  by ticking shake once per frame in `loop()` regardless of phase.
+  Reproduced and confirmed fixed via Playwright: two screenshots taken 500ms
+  apart during the game-over screen were pixel-different before the fix and
+  pixel-identical after.
+- **Twin-lane patterns double-counted the dodge.** A twin wave blocks two
+  lanes with two separate obstacle objects at the same x; one lane choice
+  dodges both, but `resolveCollisions` credited `laneDodge` once per
+  obstacle, doubling style score/currency for a single dodge decision.
+  Capped to one lane-dodge credit per resolution pass.
+- **`saveProgression` had no error handling**, unlike `loadProgression` —
+  since it runs synchronously inside the `requestAnimationFrame` loop (on
+  every crash and charm save), a thrown `setItem` (quota exceeded, or a
+  restricted Capacitor Android WebView) would have permanently frozen the
+  game loop instead of just failing to persist currency. Now wrapped in
+  try/catch, matching `loadProgression`'s existing "meta progression is a
+  bonus layer" philosophy.
+- **Loaded currency wasn't sign-validated** the way `charms` already was —
+  tampered/corrupt `localStorage` data could load a negative balance and
+  display it indefinitely. Added the same `>= 0` guard.
+- Removed `player.ts`'s unused `TIGHT_DODGE_WINDOW` constant (dead code from
+  an earlier refactor — `game.ts` has its own `DODGE_RELEVANCE_WINDOW` for
+  the same purpose, at a different value, so the two had drifted).
+
+Added regression tests for the two progression.ts fixes (negative currency
+on load, `saveProgression` swallowing a throwing store).
+
 ## Next step
 - Milestone 5 still needs: the repo owner generating a real release keystore
   + populating the `ANDROID_KEYSTORE_BASE64`/etc. GitHub secrets so

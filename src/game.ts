@@ -249,6 +249,11 @@ export class Game {
   private loop(time: number): void {
     const dt = Math.min(0.05, (time - this.lastFrameTime) / 1000);
     this.lastFrameTime = time;
+    // Ticks every frame regardless of phase — otherwise a crash's shake
+    // trauma freezes at its post-crash value forever (never decays) since
+    // update() below stops running once phase leaves "playing", leaving the
+    // game-over screen's background jittering indefinitely.
+    this.shake = tickShake(this.shake, dt);
     if (this.phase === "playing") {
       this.update(dt);
     }
@@ -265,7 +270,6 @@ export class Game {
     this.player = tickPlayer(this.player, dt);
     if (wasJumping && this.player.aerial === "running") this.spawnGroundDust();
     this.style = tickDecay(this.style, dt);
-    this.shake = tickShake(this.shake, dt);
     this.particles = advanceParticles(this.particles, dt);
     this.popups = advancePopups(this.popups, dt);
     this.emitTrail(dt);
@@ -294,6 +298,12 @@ export class Game {
   }
 
   private resolveCollisions(): void {
+    // A twin pattern blocks two lanes with two separate obstacle objects at
+    // the same x, so a single lane choice dodges both at once — cap lane-
+    // dodge credit to once per resolution pass so that one dodge doesn't
+    // double-count as two.
+    let laneDodgeCredited = false;
+
     for (const obstacle of this.obstacles) {
       if (obstacle.resolved || obstacle.x > PLAYER_X) continue;
       obstacle.resolved = true;
@@ -308,10 +318,12 @@ export class Game {
       // Full-width hazards span every lane — there's no dodging into safety,
       // the matching trick is the only way through.
       if (!isFullWidth && obstacle.lane !== this.player.lane) {
+        if (laneDodgeCredited) continue;
         const elapsed = this.clock - this.player.lastLaneChangeAt;
         if (elapsed <= DODGE_RELEVANCE_WINDOW) {
           const tightness = Math.max(0, 1 - elapsed / DODGE_RELEVANCE_WINDOW);
           this.applyTrick("laneDodge", tightness);
+          laneDodgeCredited = true;
         }
         continue;
       }

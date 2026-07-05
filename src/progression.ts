@@ -93,7 +93,7 @@ export function loadProgression(store: KeyValueStore): ProgressionState {
     if (!raw) return createProgressionState();
     const parsed = JSON.parse(raw);
     return {
-      currency: typeof parsed.currency === "number" ? parsed.currency : 0,
+      currency: typeof parsed.currency === "number" && parsed.currency >= 0 ? parsed.currency : 0,
       unlocked: Array.isArray(parsed.unlocked)
         ? parsed.unlocked.filter((id: unknown): id is CosmeticId => typeof id === "string" && id in COSMETICS)
         : [],
@@ -108,8 +108,17 @@ export function loadProgression(store: KeyValueStore): ProgressionState {
   }
 }
 
+/** Persists progression, swallowing storage errors (quota exceeded, private
+ * mode, restricted WebView storage) rather than throwing — this runs
+ * synchronously inside the game loop's requestAnimationFrame callback, and
+ * an uncaught throw there would kill the loop and freeze the game. */
 export function saveProgression(store: KeyValueStore, state: ProgressionState): void {
-  store.setItem(PROGRESSION_STORAGE_KEY, JSON.stringify(state));
+  try {
+    store.setItem(PROGRESSION_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Meta progression is a bonus layer — losing this save is better than
+    // crashing the run.
+  }
 }
 
 /** Currency earned from a finished run's total score. `multiplier` applies

@@ -1,10 +1,6 @@
 export const LANE_COUNT = 3;
 export const JUMP_DURATION = 0.5;
 export const SLIDE_DURATION = 0.5;
-/** A lane change counts as a "tight" dodge if it happens within this many
- * seconds of an obstacle reaching the player — the Style Score bonus scales
- * with how close to that edge the dodge actually was. */
-export const TIGHT_DODGE_WINDOW = 0.35;
 
 export type AerialState = "running" | "jumping" | "sliding";
 
