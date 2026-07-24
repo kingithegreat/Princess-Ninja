@@ -36,3 +36,13 @@ genuinely running. Nothing is faked; the boring frames just aren't shipped.
 
 - [ ] **Feature graphic** (1024×500) — required by Play, not yet generated
 - [x] App icon + adaptive icon — already in `android/app/src/main/res/`
+
+## Feature graphic
+
+| File | Play Console field | Spec | Status |
+|---|---|---|---|
+| `feature-graphic.png` | Feature graphic | 1024×500 PNG, no alpha | ✅ generated 2026-07-24 |
+
+Play will not publish a listing without one, and this app had none. Built from a
+real gameplay frame out of `screenshots/` plus the game's own palette — same
+treatment across the portfolio so the listings read as one studio.
