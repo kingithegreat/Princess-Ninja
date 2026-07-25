@@ -1,0 +1,35 @@
+name: Image Integrity
+
+# Asserts that every committed image file actually decodes.
+#
+# Added 2026-07-25 after 36 PNG/WebP files across two repos were found corrupt
+# (byte 0x89 replaced by the UTF-8 replacement character), including Vacuum
+# Empire's adaptive launcher icon — which would have shipped to Google Play with
+# a blank icon. Android CI was green the entire time, because nothing asserted
+# that an image is an image. This job closes that gap.
+#
+# Pure stdlib Python: no pip install, no network, runs in seconds.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  image-integrity:
+    name: image-integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false # deliberate: a bare LFS pointer must be reported, not silently fetched
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify every committed image decodes
+        run: python3 scripts/check-image-integrity.py .
