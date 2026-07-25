@@ -10,10 +10,19 @@ name: Image Integrity
 #
 # Pure stdlib Python: no pip install, no network, runs in seconds.
 
+# Trigger note (learned the hard way on 2026-07-25): this must fire on
+# 'claude/**' pushes, not just main + pull_request. Feature-branch PRs here are
+# opened by auto-merge.yml using GITHUB_TOKEN, and GitHub deliberately does not
+# let a GITHUB_TOKEN-triggered event start another workflow run — so a
+# pull_request-only trigger produced a workflow that registered correctly and
+# then never executed a single time. Same convention as ci.yml in these repos.
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - 'claude/**'
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
