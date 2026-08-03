@@ -46,3 +46,13 @@ genuinely running. Nothing is faked; the boring frames just aren't shipped.
 Play will not publish a listing without one, and this app had none. Built from a
 real gameplay frame out of `screenshots/` plus the game's own palette — same
 treatment across the portfolio so the listings read as one studio.
+
+## App icon (Play Console "App icon" field)
+
+| File | Spec | Status |
+|---|---|---|
+| `icon-512.png` | 512×512 PNG, no alpha, ≤1MB | ✅ generated 2026-08-04 |
+
+Exported from the app's real 1024×1024 adaptive-icon foreground
+(`assets/icon-foreground.png`) composed over the launcher background colour
+(`#1c1f30`) — identical art to what ships on-device, no separate branding.
