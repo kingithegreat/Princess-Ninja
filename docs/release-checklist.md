@@ -27,6 +27,17 @@ Everything else is code/CI work.
       code-verified against current build (no network calls, no analytics,
       localStorage-only persistence)
 - [x] Store listing copy drafted (`docs/store-listing.md`)
+- [x] 2026-11-15 (`feat/android-internal-ready-20261115`): `targetSdk 36`
+      confirmed against Play's Aug-31-2026 requirement; release signing can
+      also come from `ANDROID_KEYSTORE_PATH`/`ANDROID_KEYSTORE_PASSWORD`/
+      `ANDROID_KEY_ALIAS`/`ANDROID_KEY_PASSWORD` env (keystore.properties
+      still works); `versionCode`/`versionName` overridable via
+      `-PversionCode=` / `VERSION_CODE`; new `android-pr.yml` builds a debug
+      APK + **unsigned** release AAB on every PR (no secrets); hostable
+      `public/privacy.html` (served at `/privacy.html` from `dist/`); privacy
+      text corrected re: the template `INTERNET` permission; Data safety
+      notes in `docs/play-data-safety.md`; `*.jks`/`*.keystore`/
+      `keystore.properties` git-ignored at repo root
 
 ## Phase 0 — Account (the long pole; do first)
 
