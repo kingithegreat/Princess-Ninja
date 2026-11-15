@@ -1,7 +1,7 @@
 # Play Console — Data safety notes (Princess Ninja)
 
 > **STUB — Aden to review before submitting the Data safety form.** Engineering
-> notes derived from the code on branch `feat/android-internal-ready-20261115`
+> notes derived from the code on branch `arcade-forge/android-internal-ready-20261115`
 > (2026-11-15). Re-verify against the exact build you upload; if any SDK,
 > network call, ad, purchase, or permission is added, redo this page,
 > `docs/privacy-policy.md` / `public/privacy.html`, and the Console form.
