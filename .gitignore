@@ -1,3 +1,9 @@
 node_modules
 dist
 *.local
+
+# Signing material — never commit (upload key lives in a password manager +
+# the ANDROID_KEYSTORE_* Actions secrets)
+*.jks
+*.keystore
+keystore.properties

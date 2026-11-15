@@ -1,6 +1,8 @@
 # Privacy Policy — Princess Ninja
 
-> ⚠️ **DRAFT — remove this banner before publishing.** Replace every
+> ⚠️ **STUB / DRAFT — Aden to review; remove this banner before publishing.**
+> Hostable copy: `public/privacy.html` (ships in `dist/` on `npm run build`,
+> so any static host of `dist/` serves it at `/privacy.html`). Replace every
 > **[BRACKETED]** placeholder (name/studio, city, contact email, dates),
 > confirm the facts below still describe the shipped build, then host this
 > page (see `docs/release-checklist.md`) and paste the HTTPS URL into Play
@@ -33,8 +35,10 @@ Play's Designed for Families program.
 ## 3. What information the App collects
 
 **The App does not collect, store, transmit, or share any personal
-information.** It runs fully on-device: it requests no internet access, uses
-no cloud backend, includes no analytics, advertising, or crash-reporting
+information.** It runs fully on-device: it makes no network requests (the
+Android build declares the standard `INTERNET` permission only because the
+Capacitor web-view template includes it; the game never uses it), uses no
+cloud backend, includes no analytics, advertising, or crash-reporting
 SDKs, and creates no accounts. It collects no names, email addresses, phone
 numbers, location, contacts, photos, microphone, or camera data, and does
 not profile or track users.
@@ -82,3 +86,10 @@ released and update the "Last updated" date above.
 
 **[ADEN'S NAME OR STUDIO NAME]** · **[CONTACT EMAIL]** · **[CITY], New
 Zealand**
+
+---
+
+## Appendix (internal — delete before hosting): Play Data safety notes
+
+See `docs/play-data-safety.md` for the suggested Play Console Data safety
+answers derived from this build.

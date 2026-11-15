@@ -5,10 +5,24 @@ apply plugin: 'com.android.application'
 // without a keystore configured still succeeds unsigned.
 def keystorePropertiesFile = rootProject.file('keystore.properties')
 def keystoreProperties = new Properties()
-def hasSigningConfig = keystorePropertiesFile.exists()
-if (hasSigningConfig) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
+// CI alternative to keystore.properties: ANDROID_KEYSTORE_PATH (decoded from
+// the ANDROID_KEYSTORE_BASE64 secret into a temp file — never committed),
+// ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
+// Blank values (GitHub sets unset secrets to "") count as absent.
+def envOrNull = { String name ->
+    def v = System.getenv(name)
+    return (v != null && !v.trim().isEmpty()) ? v : null
+}
+def signingStorePath = envOrNull('ANDROID_KEYSTORE_PATH') ?: keystoreProperties['storeFile']
+def signingStoreFile = signingStorePath ? rootProject.file(signingStorePath) : null
+def hasSigningConfig = signingStoreFile != null && signingStoreFile.isFile()
+// Play needs a strictly increasing versionCode per upload; override without
+// editing this file via -PversionCode=2 or VERSION_CODE env.
+def appVersionCode = (findProperty('versionCode') ?: envOrNull('VERSION_CODE') ?: '1') as Integer
+def appVersionName = (findProperty('versionName') ?: envOrNull('VERSION_NAME') ?: '1.0.0') as String
 
 android {
     namespace = "com.princessninja.app"
@@ -17,8 +31,8 @@ android {
         applicationId "com.princessninja.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -29,10 +43,10 @@ android {
     signingConfigs {
         release {
             if (hasSigningConfig) {
-                storeFile rootProject.file(keystoreProperties['storeFile'])
-                storePassword keystoreProperties['storePassword']
-                keyAlias keystoreProperties['keyAlias']
-                keyPassword keystoreProperties['keyPassword']
+                storeFile signingStoreFile
+                storePassword envOrNull('ANDROID_KEYSTORE_PASSWORD') ?: keystoreProperties['storePassword']
+                keyAlias envOrNull('ANDROID_KEY_ALIAS') ?: keystoreProperties['keyAlias'] ?: 'upload'
+                keyPassword envOrNull('ANDROID_KEY_PASSWORD') ?: keystoreProperties['keyPassword']
             }
         }
     }

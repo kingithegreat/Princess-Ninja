@@ -1,0 +1,67 @@
+name: Android PR build
+
+# Builds the Android app on every PR so Android regressions are caught before
+# merge (android.yml only runs on main pushes). Produces:
+#   - debug APK (installable for quick device testing)
+#   - UNSIGNED release AAB (smoke test of the release build type)
+# No secrets are used here: the signed, Play-uploadable AAB comes only from
+# android.yml's build-release-apk job on main once ANDROID_KEYSTORE_* secrets
+# exist. Nothing in this workflow uploads to Play Console.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install required SDK packages (runner's preinstalled SDK)
+        # android-actions/setup-android@v3 now fails on ubuntu-latest: its default
+        # package list includes the removed 'tools' package ("Failed to find
+        # package 'tools'"). The runner already ships an SDK at $ANDROID_HOME, so
+        # use its newest sdkmanager directly.
+        run: |
+          SDKM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          echo "Using $SDKM"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build web + cap sync
+        run: npm run cap:sync
+      - name: Build debug APK + unsigned release AAB
+        working-directory: android
+        run: ./gradlew assembleDebug bundleRelease --stacktrace
+      - name: Verify targetSdk meets Play requirement (API 36 since 2026-08-31)
+        run: |
+          TARGET=$(grep -E 'targetSdkVersion *=' android/variables.gradle | grep -oE '[0-9]+')
+          echo "targetSdkVersion=$TARGET"
+          [ "$TARGET" -ge 36 ] || { echo "::error::targetSdkVersion $TARGET < 36 — Play will reject new submissions"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: princess-ninja-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: princess-ninja-release-unsigned-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
